@@ -1,62 +1,206 @@
 "use client";
-import { useState } from "react";
+
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Check } from "lucide-react";
+
+/*
+  All-in-one Juror Signup Flow - JSX
+  - Place in: app/signup/juror/page.jsx
+  - Make sure lucide-react is installed and the logo path /images/logo.png exists.
+*/
+
+const BLUE = "#0A2342";
+const PAGE_BG = "#f9f7f2";
+const BAND_YELLOW = "#EDE3B8"; // slightly darker yellow band
+const TICK_YELLOW = "#F6E27F";
 
 export default function SignupFlow() {
+  // steps
   const [step, setStep] = useState(1);
-  const [personalSubStep, setPersonalSubStep] = useState(1); // 1 or 2
+  const [personalSubStep, setPersonalSubStep] = useState(1);
 
-  const handleNext = () => {
-    // If on Personal Details (step 2), handle sub-step
+  // Personal details (1/2) - placeholders only (start empty)
+  const [pd1, setPd1] = useState({
+    maritalStatus: "",
+    spouseEmployer: "",
+    employerName: "",
+    employerAddress: "",
+    yearsInCounty: "",
+    ageRange: "",
+    gender: "",
+    education: "",
+  });
+
+  // Personal details (2/2)
+  const [pd2, setPd2] = useState({
+    name: "",
+    phone: "",
+    address1: "",
+    address2: "",
+    city: "",
+    state: "",
+    zip: "",
+    county: "",
+  });
+  const [payMethod, setPayMethod] = useState(null); // "venmo" | "paypal" | "cashapp"
+
+  // credentials
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+
+  // agreement
+  const [agreed, setAgreed] = useState(false);
+
+  // password rule checks
+  const pwChecks = useMemo(() => {
+    const hasLen = password.length >= 8;
+    const hasNum = /\d/.test(password);
+    const notSameAsName =
+      pd2.name.trim().length > 0 ? password.toLowerCase() !== pd2.name.trim().toLowerCase() : true;
+    const noTriple = !/(.)\1\1/.test(password);
+    const hasUpper = /[A-Z]/.test(password);
+    const hasSpecial = /[!@#$%^&*()[\]{};:'",.<>/?\\|`~_\-+=]/.test(password);
+    const confirmMatch = confirm === password && password.length > 0;
+
+    return {
+      hasLen,
+      hasNum,
+      notSameAsName,
+      noTriple,
+      hasUpper,
+      hasSpecial,
+      confirmMatch,
+      all:
+        hasLen && hasNum && notSameAsName && noTriple && hasUpper && hasSpecial && confirmMatch,
+    };
+  }, [password, confirm, pd2.name]);
+
+  // gating logic for enabling Next
+  const canProceed = (() => {
+    if (step === 1) return true; // criteria step just moves ahead
+    if (step === 2 && personalSubStep === 1) return true; // sub-step 1 has optional fields
+    if (step === 2 && personalSubStep === 2) {
+      // required: name, phone, address1, city, state, zip, county, payment method
+      return (
+        pd2.name.trim() &&
+        pd2.phone.trim() &&
+        pd2.address1.trim() &&
+        pd2.city.trim() &&
+        pd2.state.trim() &&
+        pd2.zip.trim() &&
+        pd2.county.trim() &&
+        payMethod
+      );
+    }
+    if (step === 3) return pwChecks.all && email.trim();
+    if (step === 4) return agreed;
+    return true;
+  })();
+
+  const goNext = () => {
+    if (!canProceed) return;
     if (step === 2 && personalSubStep === 1) {
       setPersonalSubStep(2);
       return;
     }
-    setPersonalSubStep(1); // reset for next time
-    setStep((prev) => Math.min(prev + 1, 5));
+    setPersonalSubStep(1);
+    setStep((s) => Math.min(s + 1, 5));
   };
 
-  const handleBack = () => {
-    // If on Personal Details (step 2) and substep 2, go back to substep 1
+  const goBack = () => {
     if (step === 2 && personalSubStep === 2) {
       setPersonalSubStep(1);
       return;
     }
-    setStep((prev) => Math.max(prev - 1, 1));
-    setPersonalSubStep(1); // reset for previous step
+    setStep((s) => Math.max(s - 1, 1));
+    setPersonalSubStep(1);
   };
 
+  // Step labels
+  const stepLabels = [
+    "Criteria Verification",
+    "Personal Details",
+    "Email & Password Set Up",
+    "User Agreement",
+    "Sign Up Complete",
+  ];
+
   return (
-    <main className="min-h-screen flex bg-[#f9f7f2]">
+    <main style={{ backgroundColor: PAGE_BG }} className="min-h-screen flex font-sans">
       {/* Sidebar */}
-      <aside className="hidden lg:flex flex-col bg-[#0A2342] text-white w-[300px] px-8 py-10">
-        <div className="flex items-center gap-2 mb-8">
-          <Image src="/images/logo.png" alt="Quick Verdicts Logo" width={36} height={36} />
-          <span className="font-semibold text-lg tracking-tight">QUICK VERDICTS</span>
+      <aside className="hidden lg:flex flex-col w-[300px]">
+        <div className="flex-1 text-white bg-[#0A2342] relative">
+          {/* Full-width Logo Plate */}
+          <div className="absolute top-15 left-0 w-full">
+            <Image
+              src="/logo_sidebar_signup.png"
+              alt="Quick Verdicts Logo"
+              width={300}
+              height={120}
+              className="w-full object-cover"
+            />
+          </div>
+
+          {/* Content Section */}
+          <div className="px-8 py-8 mt-44">
+            <h2 className="text-xl font-semibold mb-4">
+              {step === 1 && "Criteria Verification"}
+              {step === 2 && (personalSubStep === 1 ? "Personal Details (1/2)" : "Personal Details (2/2)")}
+              {step === 3 && "Email & Password Set Up"}
+              {step === 4 && "User Agreement"}
+              {step === 5 && "Sign Up Complete"}
+            </h2>
+
+            {/* Dynamic text content */}
+            <div className="text-sm leading-relaxed text-blue-100 space-y-3">
+              {step === 1 && (
+                <p>Please fill out the following fields with the necessary information.</p>
+              )}
+
+              {step === 2 && personalSubStep === 1 && (
+                <p>Please fill out the following fields with necessary information.</p>
+              )}
+
+              {step === 2 && personalSubStep === 2 && (
+                <>
+                  <p>Please fill out the following fields with necessary information.</p>
+                  <p className="mt-3">Any field with * is required.</p>
+                </>
+              )}
+
+              {step === 3 && (
+                <>
+                  <p>Create your login information in order to re-enter the platform.</p>
+                  <p>Your password must meet the listed minimum requirements.</p>
+                  <p>Re-typed password must match with the first password you have chosen.</p>
+                </>
+              )}
+
+              {step === 4 && (
+                <p>In order to proceed, you must agree to the terms outlined below.</p>
+              )}
+
+              {step === 5 && (
+                <>
+                  <p>Welcome to Quick Verdicts.</p>
+                  <p>Your account has been created successfully.</p>
+                  <p>Please note: you will have limited functionalities until your bar license has been verified.</p>
+                </>
+              )}
+            </div>
+          </div>
         </div>
-        <h2 className="text-xl font-semibold mb-2">
-          {step === 1 && "Criteria Verification"}
-          {step === 2 && (personalSubStep === 1 ? "Personal Details (1/2)" : "Personal Details (2/2)")}
-          {step === 3 && "Email & Password"}
-          {step === 4 && "User Agreement"}
-          {step === 5 && "Complete"}
-        </h2>
-        <p className="text-sm text-gray-200 leading-relaxed">
-          Please fill out the following fields with the necessary information.
-        </p>
       </aside>
 
-      {/* Main Content */}
-      <section className="flex-1 px-6 py-10 md:px-12 max-w-5xl w-full mx-auto">
-        {/* Top Navigation */}
+      {/* Main content */}
+      <section className="flex-1 px-6 py-10 md:px-12 max-w-6xl w-full mx-auto">
+        {/* Top row: back + login */}
         <div className="flex justify-between items-center mb-6">
           {step > 1 || (step === 2 && personalSubStep === 2) ? (
-            <button
-              onClick={handleBack}
-              className="text-sm text-gray-600 hover:underline flex items-center gap-1"
-            >
+            <button onClick={goBack} className="text-sm text-gray-600 hover:underline flex items-center gap-1">
               <ArrowLeft size={16} /> Back
             </button>
           ) : (
@@ -64,73 +208,102 @@ export default function SignupFlow() {
               <ArrowLeft size={16} /> Back
             </Link>
           )}
+
           <div>
             <span className="text-sm text-gray-600 mr-4">Already have an account?</span>
             <Link href="/login">
-              <button className="text-sm border border-gray-400 rounded-md px-4 py-1.5 hover:bg-gray-100">
-                Log in
-              </button>
+              <button className="text-sm border border-gray-400 rounded-md px-4 py-1.5 hover:bg-gray-100">Log in</button>
             </Link>
           </div>
         </div>
 
         {/* Stepper */}
-        <div className="flex items-center justify-between mb-8 max-w-5xl mx-auto">
-          {["Criteria Verification", "Personal Details", "Email & Password", "User Agreement", "Sign Up Complete"].map(
-            (label, index) => {
-              const stepIndex = index + 1;
-              const isActive = step === stepIndex;
-              const isCompleted = step > stepIndex;
-              return (
-                <div key={label} className="flex items-center gap-2 min-w-[140px]">
-                  <span
-                    className={`flex items-center justify-center w-6 h-6 rounded-full border-2 ${
-                      isActive
-                        ? "border-[#0A2342]"
-                        : isCompleted
-                        ? "border-green-600 bg-green-600"
-                        : "border-gray-400"
-                    }`}
-                  >
+        <div className="flex items-center justify-between mb-8 mx-auto" style={{ maxWidth: "980px" }}>
+          {stepLabels.map((label, idx) => {
+            const i = idx + 1;
+            const isActive = step === i;
+            const isCompleted = step > i || (i === 5 && step === 5); // last step appears completed once reached
+            const circleSize = 5; // rem? We'll use w-5 h-5 (smaller)
+            return (
+              <div key={label} className="flex items-center flex-1 min-w-0">
+                {/* Circle */}
+                <div
+                  className={`flex items-center justify-center rounded-full border-2`}
+                  style={{
+                    width: 20,
+                    height: 20,
+                    minWidth: 20,
+                    borderColor: isCompleted ? BLUE : "#c5cbd1", // blue for completed, gray for others
+                    backgroundColor: isCompleted ? BLUE : "white",
+                    borderWidth: 2,
+                    boxSizing: "content-box",
+                  }}
+                >
+                  {isCompleted ? (
+                    <Check size={14} color={TICK_YELLOW} />
+                  ) : (
+                    // empty circle (active and future)
                     <span
-                      className={`w-3 h-3 rounded-full ${
-                        isActive
-                          ? "bg-white"
-                          : isCompleted
-                          ? "bg-white"
-                          : "bg-[#f9f7f2]"
-                      }`}
-                    ></span>
-                  </span>
-                  <span
-                    className={`leading-tight ${
-                      isActive
-                        ? "font-bold text-[#0A2342]"
-                        : isCompleted
-                        ? "font-medium text-green-600"
-                        : "font-medium text-gray-400"
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: 9999,
+                        backgroundColor: "transparent",
+                        display: "inline-block",
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Label */}
+                <div className="ml-3 truncate">
+                  <div
+                    className={`text-sm truncate ${
+                      isActive ? "font-semibold" : "font-medium"
                     }`}
+                    style={{
+                      color: isActive ? BLUE : "#9aa3ad",
+                      fontSize: isActive ? 14 : 13,
+                      lineHeight: 1,
+                    }}
                   >
                     {label}
-                  </span>
-                  {stepIndex < 5 && <div className="flex-1 h-px bg-gray-300 mx-2" />}
+                  </div>
                 </div>
-              );
-            }
-          )}
+
+                {/* Connector */}
+                {i < stepLabels.length && (
+                  <div
+                    className="flex-1"
+                    style={{
+                      height: 1,
+                      marginLeft: 16,
+                      marginRight: 12,
+                      background:
+                        // show light gray line for all; keep subtle
+                        "linear-gradient(to right, rgba(0,0,0,0.08), rgba(0,0,0,0.04))",
+                    }}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {/* Step Content */}
-        <h1 className="text-3xl font-bold text-[#0A2342] mb-6">Sign Up</h1>
+        {/* Page title */}
+        <h1 className="text-3xl font-bold mb-6" style={{ color: BLUE }}>
+          Sign Up: Juror
+        </h1>
 
+        {/* Form body */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            handleNext();
+            goNext();
           }}
-          className="space-y-6 max-w-2xl mx-auto pb-8"
+          className="space-y-6 max-w-3xl mx-auto pb-8"
         >
-          {/* Step 1: Criteria Verification */}
+          {/* Step 1 - Criteria */}
           {step === 1 && (
             <>
               <Question label="Are you at least 18 years old?" name="age" />
@@ -151,53 +324,313 @@ export default function SignupFlow() {
             </>
           )}
 
-          {/* Step 2: Personal Details (1/2) */}
+          {/* Step 2 - Personal Details (1/2) */}
           {step === 2 && personalSubStep === 1 && (
             <>
-              <Input label="First Name" required />
-              <Input label="Last Name" required />
-              <Input label="Law Firm Entity Name" required />
+              <Select
+                label="Marital Status"
+                placeholder="Select marital status"
+                value={pd1.maritalStatus}
+                onChange={(val) => setPd1((s) => ({ ...s, maritalStatus: val }))}
+                options={[
+                  "Single",
+                  "Married",
+                  "Divorced",
+                  "Widowed",
+                  "Prefer not to say",
+                ]}
+              />
+              <Input
+                label="Spouse Employer Name"
+                placeholder="Dallas Marketing Services"
+                value={pd1.spouseEmployer}
+                onChange={(val) => setPd1((s) => ({ ...s, spouseEmployer: val }))}
+              />
+              <Input
+                label="Employer Name"
+                placeholder="Lone Star Innovations LLC"
+                value={pd1.employerName}
+                onChange={(val) => setPd1((s) => ({ ...s, employerName: val }))}
+              />
+              <Input
+                label="Employer Address"
+                placeholder="1425 Mockingbird Plaza, Suite 320 Dallas, TX 75247"
+                value={pd1.employerAddress}
+                onChange={(val) => setPd1((s) => ({ ...s, employerAddress: val }))}
+              />
+              <Select
+                label="Years in county"
+                placeholder="Select years in county"
+                value={pd1.yearsInCounty}
+                onChange={(val) => setPd1((s) => ({ ...s, yearsInCounty: val }))}
+                options={["One", "Two", "Three", "Four", "Five", "Six or more"]}
+              />
+              <Select
+                label="Age range"
+                placeholder="Select age range"
+                value={pd1.ageRange}
+                onChange={(val) => setPd1((s) => ({ ...s, ageRange: val }))}
+                options={["18-24", "25-29", "30-39", "40-49", "50-59", "60+"]}
+              />
+              <Select
+                label="Gender"
+                placeholder="Select gender"
+                value={pd1.gender}
+                onChange={(val) => setPd1((s) => ({ ...s, gender: val }))}
+                options={["Male", "Female", "Other", "Prefer not to say"]}
+              />
+              <Select
+                label="Highest-level of education"
+                placeholder="Select education level"
+                value={pd1.education}
+                onChange={(val) => setPd1((s) => ({ ...s, education: val }))}
+                options={[
+                  "High School",
+                  "Associate's Degree",
+                  "Bachelor's Degree",
+                  "Master's Degree",
+                  "Doctorate",
+                ]}
+              />
             </>
           )}
 
-          {/* Step 2: Personal Details (2/2) */}
+          {/* Step 2 - Personal Details (2/2) */}
           {step === 2 && personalSubStep === 2 && (
             <>
-              <Input label="Phone Number" required type="tel" />
-              <Input label="State" required type="text" />
-              <Input label="State Bar Number" required />
+              <Input
+                label="Name"
+                required
+                placeholder="John Doe"
+                value={pd2.name}
+                onChange={(val) => setPd2((s) => ({ ...s, name: val }))}
+              />
+
+              <Input
+                label="Phone"
+                required
+                placeholder="832-674-8776"
+                value={pd2.phone}
+                onChange={(val) => setPd2((s) => ({ ...s, phone: val }))}
+              />
+
+              <Input
+                label="Address Line 1"
+                required
+                placeholder="7423 Maple Hollow Dr"
+                value={pd2.address1}
+                onChange={(val) => setPd2((s) => ({ ...s, address1: val }))}
+              />
+
+              <Input
+                label="Address Line 2"
+                placeholder="Apt, Suite, etc. (optional)"
+                value={pd2.address2}
+                onChange={(val) => setPd2((s) => ({ ...s, address2: val }))}
+              />
+
+              {/* City / State / Zip in one row */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Input
+                  label="City"
+                  required
+                  placeholder="Dallas"
+                  value={pd2.city}
+                  onChange={(val) => setPd2((s) => ({ ...s, city: val }))}
+                />
+                <Input
+                  label="State"
+                  required
+                  placeholder="TX"
+                  value={pd2.state}
+                  onChange={(val) => setPd2((s) => ({ ...s, state: val.toUpperCase().slice(0, 2) }))}
+                />
+                <Input
+                  label="Zip"
+                  required
+                  placeholder="75123"
+                  value={pd2.zip}
+                  onChange={(val) => setPd2((s) => ({ ...s, zip: val }))}
+                />
+              </div>
+
+              <Input
+                label="County"
+                required
+                placeholder="Dallas County"
+                value={pd2.county}
+                onChange={(val) => setPd2((s) => ({ ...s, county: val }))}
+              />
+
+              {/* Payment method buttons */}
+              <div>
+                <label className="block mb-2 text-base font-medium" style={{ color: BLUE }}>
+                  Select Payment Method *
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <PaymentMethodButton
+                    label="Venmo"
+                    selected={payMethod === "venmo"}
+                    onClick={() => setPayMethod("venmo")}
+                  />
+                  <PaymentMethodButton
+                    label="PayPal"
+                    selected={payMethod === "paypal"}
+                    onClick={() => setPayMethod("paypal")}
+                  />
+                  <PaymentMethodButton
+                    label="Cash App"
+                    selected={payMethod === "cashapp"}
+                    onClick={() => setPayMethod("cashapp")}
+                  />
+                </div>
+              </div>
             </>
           )}
 
-          {/* Step 3: Email & Password */}
+          {/* Step 3 - Email & Password Set Up */}
           {step === 3 && (
             <>
-              <Input label="Email" required type="email" />
-              <Input label="Password" required type="password" />
-              <Input label="Confirm Password" required type="password" />
+              <Input
+                label="Email"
+                required
+                type="email"
+                placeholder="johndoe@gmail.com"
+                value={email}
+                onChange={(val) => setEmail(val)}
+              />
+
+              <Input
+                label="Password"
+                required
+                type="password"
+                placeholder=""
+                value={password}
+                onChange={(val) => setPassword(val)}
+              />
+
+              {/* Password rules reactive checklist */}
+              <div className="mt-2">
+                <Checklist
+                  items={[
+                    { ok: pwChecks.hasLen, text: "Be at least 8 characters" },
+                    { ok: pwChecks.hasNum, text: "Have at least 1 number" },
+                    { ok: pwChecks.notSameAsName, text: "Not be the same as the account name" },
+                    {
+                      ok: pwChecks.noTriple,
+                      text: "Your password must not contain more than 2 consecutive identical characters",
+                    },
+                    { ok: pwChecks.hasUpper, text: "Have at least 1 capital letter" },
+                    { ok: pwChecks.hasSpecial, text: "Have at least 1 special character" },
+                  ]}
+                />
+              </div>
+
+              <Input
+                label="Re-type Password"
+                required
+                type="password"
+                placeholder=""
+                value={confirm}
+                onChange={(val) => setConfirm(val)}
+              />
+
+              {/* confirm match */}
+              <div className="mt-2">
+                <Checklist items={[{ ok: pwChecks.confirmMatch, text: "Re-typed password must match" }]} />
+              </div>
             </>
           )}
 
-          {/* Step 4: User Agreement */}
+          {/* Step 4 - User Agreement */}
           {step === 4 && (
-            <label className="flex items-center gap-2">
-              <input type="checkbox" className="accent-[#0A2342]" /> I agree to the Terms and Conditions
-            </label>
+            <div>
+              <h2 className="text-2xl font-semibold mb-3" style={{ color: BLUE }}>
+                Juror User Agreement for Quick Verdicts
+              </h2>
+
+              <div className="max-h-64 overflow-y-auto p-4 border rounded-md bg-white text-sm text-gray-800 leading-relaxed">
+                {/* Placeholder long agreement text */}
+                <p>
+                  Effective Date: [Insert Date]
+                </p>
+
+                <p className="mt-3">
+                  Welcome to QuickVerdicts. This Juror User Agreement ("Agreement") governs your use of
+                  our virtual platform. By registering or using QuickVerdicts as a juror, you agree to
+                  the following terms and conditions.
+                </p>
+
+                <p className="mt-3 font-medium">1. Eligibility and Verification</p>
+                <ul className="list-disc pl-6">
+                  <li>You must provide accurate and current verification information.</li>
+                  <li>Verification steps may be required before you can access full features.</li>
+                </ul>
+
+                <p className="mt-3 font-medium">2. Use of the Platform</p>
+                <ul className="list-disc pl-6">
+                  <li>Use QuickVerdicts only for legitimate purposes and follow platform guidance.</li>
+                  <li>Respect privacy and confidentiality of case materials.</li>
+                </ul>
+
+                <p className="mt-3 font-medium">3. Conduct</p>
+                <ul className="list-disc pl-6">
+                  <li>Maintain professional conduct. Do not harass or disrupt proceedings.</li>
+                </ul>
+
+                <p className="mt-3">[More terms... you can replace with the actual text later]</p>
+              </div>
+
+              <label className="flex items-center gap-2 mt-4">
+                <input type="checkbox" className="accent-[#0A2342]" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+                I agree to the Juror User Agreement.
+              </label>
+            </div>
           )}
 
-          {/* Step 5: Complete */}
+          {/* Step 5 - Complete */}
           {step === 5 && (
-            <p className="text-lg text-green-600 font-semibold">🎉 Your registration is complete!</p>
+            <div className="space-y-6">
+              <h2 className="text-2xl font-semibold" style={{ color: BLUE }}>
+                Account Creation Successful
+              </h2>
+
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center">
+                  <Check size={20} color="white" />
+                </div>
+                <div>
+                  <p className="text-base font-medium" style={{ color: BLUE }}>
+                    Your Account has been created successfully.
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-700 max-w-2xl">
+                Please note: You will have limited functionalities until your bar license has been verified.
+                To view updates on your application, please refer to your <span className="underline">Profile</span> or{" "}
+                <span className="underline">contact us</span> directly.
+              </p>
+
+              <Link href="/juror/portal">
+                <button className="mt-2 px-6 py-2 bg-[#0A2342] text-white rounded-md hover:bg-[#132c54]">
+                  Proceed to Juror Portal
+                </button>
+              </Link>
+            </div>
           )}
 
-          {/* Next Button */}
+          {/* Bottom action */}
           {step < 5 && (
             <div className="pt-4">
               <button
                 type="submit"
-                className="w-full bg-[#0A2342] text-white font-medium px-8 py-2 rounded-md hover:bg-[#132c54] transition"
+                disabled={!canProceed}
+                className={`w-full text-white font-medium px-8 py-2 rounded-md transition ${
+                  canProceed ? "bg-[#0A2342] hover:bg-[#132c54]" : "bg-gray-300 cursor-not-allowed"
+                }`}
               >
-                Next
+                {step === 4 ? "Agree and Create Account" : "Next"}
               </button>
             </div>
           )}
@@ -207,35 +640,104 @@ export default function SignupFlow() {
   );
 }
 
-/* Reusable Question Component */
+/* -------------------- Small Reusable UI parts (JSX) -------------------- */
+
 function Question({ label, name }) {
   return (
-    <div>
-      <label className="block mb-2 text-base text-[#0A2342] font-medium">{label}</label>
+    <div className="mb-4">
+      <label className="block mb-2 text-base font-medium" style={{ color: BLUE }}>
+        {label}
+      </label>
       <div className="flex gap-6">
         <label className="flex items-center gap-2">
-          <input type="radio" name={name} value="yes" className="accent-[#0A2342]" /> Yes
+          <input type="radio" name={name} value="yes" className="accent-[#0A2342]" /> <span>Yes</span>
         </label>
         <label className="flex items-center gap-2">
-          <input type="radio" name={name} value="no" className="accent-[#0A2342]" /> No
+          <input type="radio" name={name} value="no" className="accent-[#0A2342]" /> <span>No</span>
         </label>
       </div>
     </div>
   );
 }
 
-/* Reusable Input Component */
-function Input({ label, required, type = "text" }) {
+function Input({ label, required, type = "text", placeholder = "", value = "", onChange = () => {} }) {
   return (
-    <div>
-      <label className="block mb-2 text-base text-[#0A2342] font-medium">
+    <div className="mb-4">
+      <label className="block mb-2 text-base font-medium" style={{ color: BLUE }}>
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       <input
         type={type}
         required={required}
-        className="w-full border border-gray-300 rounded-md px-4 py-2 focus:ring-2 focus:ring-[#0A2342] outline-none text-[#0A2342] bg-white"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border border-gray-300 rounded-md px-4 py-2 focus:ring-2 focus:ring-[#0A2342] outline-none text-[#0A2342] bg-white placeholder-gray-400"
       />
     </div>
+  );
+}
+
+function Select({ label, value, onChange = () => {}, options = [], placeholder = "" }) {
+  return (
+    <div className="mb-4">
+      <label className="block mb-2 text-base font-medium" style={{ color: BLUE }}>
+        {label}
+      </label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border border-gray-300 rounded-md px-4 py-2 text-[#0A2342] bg-white focus:ring-2 focus:ring-[#0A2342] outline-none"
+      >
+        <option value="">{placeholder || "Select..."}</option>
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function PaymentMethodButton({ label, selected, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full border rounded-md px-4 py-2 text-left transition ${
+        selected ? "border-[#0A2342] ring-2 ring-[#0A2342]" : "border-gray-300 hover:border-gray-400"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className={`w-6 h-6 rounded-full border flex items-center justify-center ${
+            selected ? "bg-[#0A2342] border-[#0A2342]" : "bg-white border-gray-300"
+          }`}
+        >
+          {selected && <Check size={14} color={TICK_YELLOW} />}
+        </div>
+        <div className="text-[#0A2342] font-medium">{label}</div>
+      </div>
+    </button>
+  );
+}
+
+function Checklist({ items }) {
+  return (
+    <ul className="text-sm space-y-2">
+      {items.map((it, idx) => (
+        <li key={idx} className="flex items-start gap-3">
+          <div
+            className={`mt-1 inline-flex items-center justify-center w-5 h-5 rounded-sm border ${
+              it.ok ? "bg-[#0A2342] border-[#0A2342]" : "bg-white border-gray-300"
+            }`}
+          >
+            {it.ok && <Check size={14} color={it.ok ? TICK_YELLOW : "transparent"} />}
+          </div>
+          <div className="text-gray-700">{it.text}</div>
+        </li>
+      ))}
+    </ul>
   );
 }
