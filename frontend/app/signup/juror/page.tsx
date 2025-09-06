@@ -1,28 +1,67 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
+import type { FC, FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, Check } from "lucide-react";
 
 /*
-  All-in-one Juror Signup Flow - JSX
-  - Place in: app/signup/juror/page.jsx
-  - Make sure lucide-react is installed and the logo path /images/logo.png exists.
+  All-in-one Juror Signup Flow - TSX
+  - Place in: app/signup/juror/page.tsx
+  - Make sure lucide-react is installed and the logo path /logo_sidebar_signup.png exists.
 */
 
 const BLUE = "#0A2342";
 const PAGE_BG = "#f9f7f2";
-const BAND_YELLOW = "#EDE3B8"; // slightly darker yellow band
+const BAND_YELLOW = "#EDE3B8"; // slightly darker yellow band (kept for parity)
 const TICK_YELLOW = "#F6E27F";
 
-export default function SignupFlow() {
+type Step = 1 | 2 | 3 | 4 | 5;
+type PersonalSubStep = 1 | 2;
+
+type PD1 = {
+  maritalStatus: string;
+  spouseEmployer: string;
+  employerName: string;
+  employerAddress: string;
+  yearsInCounty: string;
+  ageRange: string;
+  gender: string;
+  education: string;
+};
+
+type PD2 = {
+  name: string;
+  phone: string;
+  address1: string;
+  address2: string;
+  city: string;
+  state: string;
+  zip: string;
+  county: string;
+};
+
+type PayMethod = "venmo" | "paypal" | "cashapp" | null;
+
+type PwChecks = {
+  hasLen: boolean;
+  hasNum: boolean;
+  notSameAsName: boolean;
+  noTriple: boolean;
+  hasUpper: boolean;
+  hasSpecial: boolean;
+  confirmMatch: boolean;
+  all: boolean;
+};
+
+export default function SignupFlow(): JSX.Element {
   // steps
-  const [step, setStep] = useState(1);
-  const [personalSubStep, setPersonalSubStep] = useState(1);
+  const [step, setStep] = useState<Step>(1);
+  const [personalSubStep, setPersonalSubStep] = useState<PersonalSubStep>(1);
 
   // Personal details (1/2) - placeholders only (start empty)
-  const [pd1, setPd1] = useState({
+  const [pd1, setPd1] = useState<PD1>({
     maritalStatus: "",
     spouseEmployer: "",
     employerName: "",
@@ -34,7 +73,7 @@ export default function SignupFlow() {
   });
 
   // Personal details (2/2)
-  const [pd2, setPd2] = useState({
+  const [pd2, setPd2] = useState<PD2>({
     name: "",
     phone: "",
     address1: "",
@@ -44,18 +83,19 @@ export default function SignupFlow() {
     zip: "",
     county: "",
   });
-  const [payMethod, setPayMethod] = useState(null); // "venmo" | "paypal" | "cashapp"
+
+  const [payMethod, setPayMethod] = useState<PayMethod>(null); // "venmo" | "paypal" | "cashapp"
 
   // credentials
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [confirm, setConfirm] = useState<string>("");
 
   // agreement
-  const [agreed, setAgreed] = useState(false);
+  const [agreed, setAgreed] = useState<boolean>(false);
 
   // password rule checks
-  const pwChecks = useMemo(() => {
+  const pwChecks: PwChecks = useMemo(() => {
     const hasLen = password.length >= 8;
     const hasNum = /\d/.test(password);
     const notSameAsName =
@@ -75,58 +115,63 @@ export default function SignupFlow() {
       confirmMatch,
       all:
         hasLen && hasNum && notSameAsName && noTriple && hasUpper && hasSpecial && confirmMatch,
-    };
+    } as PwChecks;
   }, [password, confirm, pd2.name]);
 
   // gating logic for enabling Next
-  const canProceed = (() => {
+  const canProceed: boolean = (() => {
     if (step === 1) return true; // criteria step just moves ahead
     if (step === 2 && personalSubStep === 1) return true; // sub-step 1 has optional fields
     if (step === 2 && personalSubStep === 2) {
       // required: name, phone, address1, city, state, zip, county, payment method
       return (
-        pd2.name.trim() &&
-        pd2.phone.trim() &&
-        pd2.address1.trim() &&
-        pd2.city.trim() &&
-        pd2.state.trim() &&
-        pd2.zip.trim() &&
-        pd2.county.trim() &&
-        payMethod
+        Boolean(pd2.name.trim()) &&
+        Boolean(pd2.phone.trim()) &&
+        Boolean(pd2.address1.trim()) &&
+        Boolean(pd2.city.trim()) &&
+        Boolean(pd2.state.trim()) &&
+        Boolean(pd2.zip.trim()) &&
+        Boolean(pd2.county.trim()) &&
+        Boolean(payMethod)
       );
     }
-    if (step === 3) return pwChecks.all && email.trim();
+    if (step === 3) return pwChecks.all && Boolean(email.trim());
     if (step === 4) return agreed;
     return true;
   })();
 
-  const goNext = () => {
+  const goNext = (): void => {
     if (!canProceed) return;
     if (step === 2 && personalSubStep === 1) {
       setPersonalSubStep(2);
       return;
     }
     setPersonalSubStep(1);
-    setStep((s) => Math.min(s + 1, 5));
+    setStep((s) => (Math.min(s + 1, 5) as Step));
   };
 
-  const goBack = () => {
+  const goBack = (): void => {
     if (step === 2 && personalSubStep === 2) {
       setPersonalSubStep(1);
       return;
     }
-    setStep((s) => Math.max(s - 1, 1));
+    setStep((s) => (Math.max(s - 1, 1) as Step));
     setPersonalSubStep(1);
   };
 
   // Step labels
-  const stepLabels = [
+  const stepLabels: string[] = [
     "Criteria Verification",
     "Personal Details",
     "Email & Password Set Up",
     "User Agreement",
     "Sign Up Complete",
   ];
+
+  const onSubmit = (e: FormEvent<HTMLFormElement>): void => {
+    e.preventDefault();
+    goNext();
+  };
 
   return (
     <main style={{ backgroundColor: PAGE_BG }} className="min-h-screen flex font-sans">
@@ -141,6 +186,7 @@ export default function SignupFlow() {
               width={300}
               height={120}
               className="w-full object-cover"
+              priority
             />
           </div>
 
@@ -220,10 +266,9 @@ export default function SignupFlow() {
         {/* Stepper */}
         <div className="flex items-center justify-between mb-8 mx-auto" style={{ maxWidth: "980px" }}>
           {stepLabels.map((label, idx) => {
-            const i = idx + 1;
+            const i = (idx + 1) as Step;
             const isActive = step === i;
             const isCompleted = step > i || (i === 5 && step === 5); // last step appears completed once reached
-            const circleSize = 5; // rem? We'll use w-5 h-5 (smaller)
             return (
               <div key={label} className="flex items-center flex-1 min-w-0">
                 {/* Circle */}
@@ -258,9 +303,7 @@ export default function SignupFlow() {
                 {/* Label */}
                 <div className="ml-3 truncate">
                   <div
-                    className={`text-sm truncate ${
-                      isActive ? "font-semibold" : "font-medium"
-                    }`}
+                    className={`text-sm truncate ${isActive ? "font-semibold" : "font-medium"}`}
                     style={{
                       color: isActive ? BLUE : "#9aa3ad",
                       fontSize: isActive ? 14 : 13,
@@ -272,7 +315,7 @@ export default function SignupFlow() {
                 </div>
 
                 {/* Connector */}
-                {i < stepLabels.length && (
+                {i < (stepLabels.length as Step) && (
                   <div
                     className="flex-1"
                     style={{
@@ -296,13 +339,7 @@ export default function SignupFlow() {
         </h1>
 
         {/* Form body */}
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            goNext();
-          }}
-          className="space-y-6 max-w-3xl mx-auto pb-8"
-        >
+        <form onSubmit={onSubmit} className="space-y-6 max-w-3xl mx-auto pb-8">
           {/* Step 1 - Criteria */}
           {step === 1 && (
             <>
@@ -332,13 +369,7 @@ export default function SignupFlow() {
                 placeholder="Select marital status"
                 value={pd1.maritalStatus}
                 onChange={(val) => setPd1((s) => ({ ...s, maritalStatus: val }))}
-                options={[
-                  "Single",
-                  "Married",
-                  "Divorced",
-                  "Widowed",
-                  "Prefer not to say",
-                ]}
+                options={["Single", "Married", "Divorced", "Widowed", "Prefer not to say"]}
               />
               <Input
                 label="Spouse Employer Name"
@@ -443,7 +474,9 @@ export default function SignupFlow() {
                   required
                   placeholder="TX"
                   value={pd2.state}
-                  onChange={(val) => setPd2((s) => ({ ...s, state: val.toUpperCase().slice(0, 2) }))}
+                  onChange={(val) =>
+                    setPd2((s) => ({ ...s, state: val.toUpperCase().slice(0, 2) }))
+                  }
                 />
                 <Input
                   label="Zip"
@@ -551,9 +584,7 @@ export default function SignupFlow() {
 
               <div className="max-h-64 overflow-y-auto p-4 border rounded-md bg-white text-sm text-gray-800 leading-relaxed">
                 {/* Placeholder long agreement text */}
-                <p>
-                  Effective Date: [Insert Date]
-                </p>
+                <p>Effective Date: [Insert Date]</p>
 
                 <p className="mt-3">
                   Welcome to QuickVerdicts. This Juror User Agreement ("Agreement") governs your use of
@@ -582,7 +613,12 @@ export default function SignupFlow() {
               </div>
 
               <label className="flex items-center gap-2 mt-4">
-                <input type="checkbox" className="accent-[#0A2342]" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  className="accent-[#0A2342]"
+                  checked={agreed}
+                  onChange={(e) => setAgreed(e.target.checked)}
+                />
                 I agree to the Juror User Agreement.
               </label>
             </div>
@@ -640,9 +676,14 @@ export default function SignupFlow() {
   );
 }
 
-/* -------------------- Small Reusable UI parts (JSX) -------------------- */
+/* -------------------- Small Reusable UI parts (TSX) -------------------- */
 
-function Question({ label, name }) {
+interface QuestionProps {
+  label: string;
+  name: string;
+}
+
+const Question: FC<QuestionProps> = ({ label, name }) => {
   return (
     <div className="mb-4">
       <label className="block mb-2 text-base font-medium" style={{ color: BLUE }}>
@@ -658,9 +699,18 @@ function Question({ label, name }) {
       </div>
     </div>
   );
+};
+
+interface InputProps {
+  label: string;
+  required?: boolean;
+  type?: string;
+  placeholder?: string;
+  value: string;
+  onChange: (val: string) => void;
 }
 
-function Input({ label, required, type = "text", placeholder = "", value = "", onChange = () => {} }) {
+const Input: FC<InputProps> = ({ label, required, type = "text", placeholder = "", value = "", onChange }) => {
   return (
     <div className="mb-4">
       <label className="block mb-2 text-base font-medium" style={{ color: BLUE }}>
@@ -676,9 +726,17 @@ function Input({ label, required, type = "text", placeholder = "", value = "", o
       />
     </div>
   );
+};
+
+interface SelectProps {
+  label: string;
+  value: string;
+  onChange?: (val: string) => void;
+  options?: string[];
+  placeholder?: string;
 }
 
-function Select({ label, value, onChange = () => {}, options = [], placeholder = "" }) {
+const Select: FC<SelectProps> = ({ label, value, onChange = () => {}, options = [], placeholder = "" }) => {
   return (
     <div className="mb-4">
       <label className="block mb-2 text-base font-medium" style={{ color: BLUE }}>
@@ -698,9 +756,15 @@ function Select({ label, value, onChange = () => {}, options = [], placeholder =
       </select>
     </div>
   );
+};
+
+interface PaymentMethodButtonProps {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
 }
 
-function PaymentMethodButton({ label, selected, onClick }) {
+const PaymentMethodButton: FC<PaymentMethodButtonProps> = ({ label, selected, onClick }) => {
   return (
     <button
       type="button"
@@ -721,9 +785,14 @@ function PaymentMethodButton({ label, selected, onClick }) {
       </div>
     </button>
   );
+};
+
+interface ChecklistItem {
+  ok: boolean;
+  text: string;
 }
 
-function Checklist({ items }) {
+const Checklist: FC<{ items: ChecklistItem[] }> = ({ items }) => {
   return (
     <ul className="text-sm space-y-2">
       {items.map((it, idx) => (
@@ -740,4 +809,4 @@ function Checklist({ items }) {
       ))}
     </ul>
   );
-}
+};

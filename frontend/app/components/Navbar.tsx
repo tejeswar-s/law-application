@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { FC } from "react";
 
-export default function Navbar() {
+const Navbar: FC = () => {
   return (
     <nav className="w-full bg-white border-b shadow-sm fixed top-0 left-0 z-50">
       <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
@@ -48,4 +49,6 @@ export default function Navbar() {
       </div>
     </nav>
   );
-}
+};
+
+export default Navbar;

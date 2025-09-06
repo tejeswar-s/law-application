@@ -60,7 +60,7 @@ export default function AttorneyLogin() {
           </Link>
         </div>
 
-        {/* Login form (mostly left aligned) */}
+        {/* Login form */}
         <div className="flex flex-1 items-center">
           <div className="max-w-md w-full ml-16">
             <h1 className="text-2xl font-bold mb-8" style={{ color: BLUE }}>

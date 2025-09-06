@@ -5,10 +5,10 @@ import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
 
 export default function AttorneySignup() {
-  const [step, setStep] = useState(2); // Start at section 2 for dev/testing
+  const [step, setStep] = useState<number>(2); // Start at section 2 for dev/testing
 
   const totalSteps = 5;
-  const steps = [
+  const steps: string[] = [
     "Personal Details",
     "Registered Address",
     "Email & Password Set Up",
@@ -42,15 +42,23 @@ export default function AttorneySignup() {
               <span className="font-bold text-base text-[#16305B] tracking-tight">
                 QUICK VERDICTS
               </span>
-              <span className="text-xs text-[#16305B] tracking-wide" style={{ letterSpacing: "0.04em" }}>
+              <span
+                className="text-xs text-[#16305B] tracking-wide"
+                style={{ letterSpacing: "0.04em" }}
+              >
                 VIRTUAL TRIALS • DELIBERATED VERDICTS
               </span>
             </div>
           </div>
           <div className="flex-1 flex flex-col justify-center px-8">
-            <h2 className="text-2xl font-bold mb-2 text-white leading-tight">Sign Up:<br />Attorney</h2>
+            <h2 className="text-2xl font-bold mb-2 text-white leading-tight">
+              Sign Up:
+              <br />
+              Attorney
+            </h2>
             <p className="text-sm text-[#e3e3e3] leading-relaxed mb-2">
-              Please fill out the following fields with the necessary information.
+              Please fill out the following fields with the necessary
+              information.
             </p>
             <p className="text-sm text-[#e3e3e3]">
               Any with <span className="text-red-400">*</span> is required.
@@ -69,13 +77,18 @@ export default function AttorneySignup() {
               className="text-[#16305B] text-base flex items-center gap-1 hover:underline"
               disabled={step === 1}
               tabIndex={step === 1 ? -1 : 0}
-              style={{ opacity: step === 1 ? 0.5 : 1, pointerEvents: step === 1 ? "none" : "auto" }}
+              style={{
+                opacity: step === 1 ? 0.5 : 1,
+                pointerEvents: step === 1 ? "none" : "auto",
+              }}
             >
               <ArrowLeft size={18} /> Back
             </button>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-[#16305B] text-sm">Already have an account?</span>
+            <span className="text-[#16305B] text-sm">
+              Already have an account?
+            </span>
             <Link href="/login">
               <button className="border border-[#16305B] text-[#16305B] rounded-md px-4 py-1.5 text-sm hover:bg-[#f3f6fa] transition">
                 Log In
@@ -104,8 +117,18 @@ export default function AttorneySignup() {
                     `}
                   >
                     {isCompleted ? (
-                      <svg width="14" height="14" viewBox="0 0 14 14" className="text-white">
-                        <path d="M4 7.5l2 2 4-4" stroke="white" strokeWidth="2" fill="none" />
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 14 14"
+                        className="text-white"
+                      >
+                        <path
+                          d="M4 7.5l2 2 4-4"
+                          stroke="white"
+                          strokeWidth="2"
+                          fill="none"
+                        />
                       </svg>
                     ) : (
                       <span
@@ -135,12 +158,15 @@ export default function AttorneySignup() {
           })}
         </div>
 
-        {/* Registered Address Form - Replicate from provided image */}
+        {/* Section 2 (Registered Address Form) */}
         {step === 2 && (
           <div className="flex-1 flex flex-col items-center px-8">
             <div className="w-full max-w-2xl">
-              <h1 className="text-3xl font-bold text-[#16305B] mb-8 mt-2">Sign Up: Attorney</h1>
+              <h1 className="text-3xl font-bold text-[#16305B] mb-8 mt-2">
+                Sign Up: Attorney
+              </h1>
               <form className="space-y-6">
+                {/* Office Address 1 */}
                 <div>
                   <label className="block mb-1 text-[#16305B] font-medium">
                     Office Address 1 <span className="text-red-500">*</span>
@@ -152,6 +178,7 @@ export default function AttorneySignup() {
                     className="w-full px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
                   />
                 </div>
+                {/* Office Address 2 */}
                 <div>
                   <label className="block mb-1 text-[#16305B] font-medium">
                     Office Address 2
@@ -162,6 +189,7 @@ export default function AttorneySignup() {
                     className="w-full px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
                   />
                 </div>
+                {/* City */}
                 <div>
                   <label className="block mb-1 text-[#16305B] font-medium">
                     City <span className="text-red-500">*</span>
@@ -173,6 +201,7 @@ export default function AttorneySignup() {
                     className="w-full px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
                   />
                 </div>
+                {/* State */}
                 <div>
                   <label className="block mb-1 text-[#16305B] font-medium">
                     State <span className="text-red-500">*</span>
@@ -190,6 +219,7 @@ export default function AttorneySignup() {
                     <option value="NY">New York</option>
                   </select>
                 </div>
+                {/* Zip */}
                 <div>
                   <label className="block mb-1 text-[#16305B] font-medium">
                     ZIP Code <span className="text-red-500">*</span>
@@ -219,8 +249,11 @@ export default function AttorneySignup() {
         {step === 1 && (
           <div className="flex-1 flex flex-col items-center px-8">
             <div className="w-full max-w-2xl">
-              <h1 className="text-3xl font-bold text-[#16305B] mb-8 mt-2">Sign Up: Attorney</h1>
+              <h1 className="text-3xl font-bold text-[#16305B] mb-8 mt-2">
+                Sign Up: Attorney
+              </h1>
               <form className="space-y-6">
+                {/* Checkbox */}
                 <div>
                   <label className="block mb-2 text-[#16305B] font-medium">
                     Who is signing up? <span className="text-red-500">*</span>
@@ -236,6 +269,7 @@ export default function AttorneySignup() {
                     </span>
                   </div>
                 </div>
+                {/* First Name */}
                 <div>
                   <label className="block mb-1 text-[#16305B] font-medium">
                     First Name <span className="text-red-500">*</span>
@@ -247,6 +281,7 @@ export default function AttorneySignup() {
                     className="w-full px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
                   />
                 </div>
+                {/* Middle Name */}
                 <div>
                   <label className="block mb-1 text-[#16305B] font-medium">
                     Middle Name
@@ -257,6 +292,7 @@ export default function AttorneySignup() {
                     className="w-full px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
                   />
                 </div>
+                {/* Last Name */}
                 <div>
                   <label className="block mb-1 text-[#16305B] font-medium">
                     Last Name <span className="text-red-500">*</span>
@@ -268,6 +304,7 @@ export default function AttorneySignup() {
                     className="w-full px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
                   />
                 </div>
+                {/* Law Firm */}
                 <div>
                   <label className="block mb-1 text-[#16305B] font-medium">
                     Law Firm Entity Name <span className="text-red-500">*</span>
@@ -279,6 +316,7 @@ export default function AttorneySignup() {
                     className="w-full px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
                   />
                 </div>
+                {/* Phone */}
                 <div>
                   <label className="block mb-1 text-[#16305B] font-medium">
                     Phone Number <span className="text-red-500">*</span>
@@ -290,6 +328,7 @@ export default function AttorneySignup() {
                     className="w-full px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
                   />
                 </div>
+                {/* State */}
                 <div>
                   <label className="block mb-1 text-[#16305B] font-medium">
                     State <span className="text-red-500">*</span>
@@ -307,6 +346,7 @@ export default function AttorneySignup() {
                     <option value="NY">New York</option>
                   </select>
                 </div>
+                {/* State Bar */}
                 <div>
                   <label className="block mb-1 text-[#16305B] font-medium">
                     State Bar Number <span className="text-red-500">*</span>
@@ -332,12 +372,15 @@ export default function AttorneySignup() {
           </div>
         )}
 
-        {/* Section 3 (Email & Password Set Up) */}
+        {/* Section 3 (Email & Password) */}
         {step === 3 && (
           <div className="flex-1 flex flex-col items-center px-8">
             <div className="w-full max-w-2xl">
-              <h1 className="text-3xl font-bold text-[#16305B] mb-8 mt-2">Sign Up: Attorney</h1>
+              <h1 className="text-3xl font-bold text-[#16305B] mb-8 mt-2">
+                Sign Up: Attorney
+              </h1>
               <form className="space-y-6">
+                {/* Email */}
                 <div>
                   <label className="block mb-1 text-[#16305B] font-medium">
                     Email
@@ -349,6 +392,7 @@ export default function AttorneySignup() {
                     className="w-full px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
                   />
                 </div>
+                {/* Password */}
                 <div>
                   <label className="block mb-1 text-[#16305B] font-medium">
                     Password
@@ -359,35 +403,24 @@ export default function AttorneySignup() {
                     placeholder="Password"
                     className="w-full px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
                   />
+                  {/* Password Rules */}
                   <div className="mt-2 space-y-1 text-[14px] text-[#16305B]">
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" disabled className="accent-[#16305B]" />
-                      <span>Be at least 8 characters</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" disabled className="accent-[#16305B]" />
-                      <span>Have at least one number</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" disabled className="accent-[#16305B]" />
-                      <span>Not be the same as the account name</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" disabled className="accent-[#16305B]" />
-                      <span>Your password must not contain more than 2 consecutive identical characters</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" disabled className="accent-[#16305B]" />
-                      <span>Have at lease one capital letter</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" disabled className="accent-[#16305B]" />
-                      <span>
-                        Have at least one special character (<span className="font-mono">! @ # $ . – + , ;</span>)
-                      </span>
-                    </div>
+                    {[
+                      "Be at least 8 characters",
+                      "Have at least one number",
+                      "Not be the same as the account name",
+                      "Your password must not contain more than 2 consecutive identical characters",
+                      "Have at least one capital letter",
+                      "Have at least one special character (! @ # $ . – + , ;)",
+                    ].map((rule, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input type="checkbox" disabled className="accent-[#16305B]" />
+                        <span>{rule}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
+                {/* Confirm Password */}
                 <div>
                   <label className="block mb-1 text-[#16305B] font-medium">
                     Re-type Password
@@ -417,12 +450,20 @@ export default function AttorneySignup() {
         {step === 4 && (
           <div className="flex-1 flex flex-col items-center px-8">
             <div className="w-full max-w-2xl">
-              <h1 className="text-3xl font-bold text-[#16305B] mb-8 mt-2">Sign Up: Attorney</h1>
+              <h1 className="text-3xl font-bold text-[#16305B] mb-8 mt-2">
+                Sign Up: Attorney
+              </h1>
               <form className="space-y-6">
                 <div>
                   <label className="block mb-2 text-[#16305B] font-medium">
-                    <input type="checkbox" className="mr-2 accent-[#16305B]" required />
-                    I agree to the <span className="underline">User Agreement</span> <span className="text-red-500">*</span>
+                    <input
+                      type="checkbox"
+                      className="mr-2 accent-[#16305B]"
+                      required
+                    />
+                    I agree to the{" "}
+                    <span className="underline">User Agreement</span>{" "}
+                    <span className="text-red-500">*</span>
                   </label>
                 </div>
                 <div className="pt-2">
@@ -448,7 +489,14 @@ export default function AttorneySignup() {
               </h1>
               <div className="flex flex-col items-center justify-center">
                 <svg width="90" height="90" viewBox="0 0 90 90" className="mb-6">
-                  <circle cx="45" cy="45" r="40" fill="none" stroke="#19C900" strokeWidth="6" />
+                  <circle
+                    cx="45"
+                    cy="45"
+                    r="40"
+                    fill="none"
+                    stroke="#19C900"
+                    strokeWidth="6"
+                  />
                   <polyline
                     points="30,48 42,60 62,36"
                     fill="none"
@@ -462,10 +510,23 @@ export default function AttorneySignup() {
                   Your Account has been created successfully.
                 </div>
                 <div className="text-[#222] text-base mb-8 text-center max-w-xl">
-                  Please note: You will have limited functionalities until your bar license has been verified.
-                  To view updates on your verification, please refer to your{" "}
-                  <Link href="/profile" className="underline text-[#16305B] font-medium">Profile</Link> or{" "}
-                  <Link href="/contact" className="underline text-[#16305B] font-medium">contact us</Link> directly.
+                  Please note: You will have limited functionalities until your
+                  bar license has been verified. To view updates on your
+                  verification, please refer to your{" "}
+                  <Link
+                    href="/profile"
+                    className="underline text-[#16305B] font-medium"
+                  >
+                    Profile
+                  </Link>{" "}
+                  or{" "}
+                  <Link
+                    href="/contact"
+                    className="underline text-[#16305B] font-medium"
+                  >
+                    contact us
+                  </Link>{" "}
+                  directly.
                 </div>
                 <Link href="/attorney-portal" className="w-full">
                   <button className="w-full max-w-md bg-[#16305B] text-white font-semibold px-8 py-2 rounded-md hover:bg-[#0A2342] transition mx-auto">
