@@ -1,4 +1,4 @@
-const { poolPromise } = require('../config/db');
+const { poolPromise } = require("../config/db");
 
 /**
  * Find juror by email
@@ -8,9 +8,7 @@ const { poolPromise } = require('../config/db');
 async function findByEmail(email) {
   try {
     const pool = await poolPromise;
-    const result = await pool.request()
-      .input('email', email)
-      .query(`
+    const result = await pool.request().input("email", email).query(`
         SELECT 
           JurorId,
           Name,
@@ -50,7 +48,7 @@ async function findByEmail(email) {
       `);
     return result.recordset[0] || null;
   } catch (error) {
-    console.error('Error finding juror by email:', error);
+    console.error("Error finding juror by email:", error);
     throw error;
   }
 }
@@ -63,9 +61,7 @@ async function findByEmail(email) {
 async function findById(jurorId) {
   try {
     const pool = await poolPromise;
-    const result = await pool.request()
-      .input('jurorId', jurorId)
-      .query(`
+    const result = await pool.request().input("jurorId", jurorId).query(`
         SELECT 
           JurorId,
           Name,
@@ -104,7 +100,7 @@ async function findById(jurorId) {
       `);
     return result.recordset[0] || null;
   } catch (error) {
-    console.error('Error finding juror by ID:', error);
+    console.error("Error finding juror by ID:", error);
     throw error;
   }
 }
@@ -117,29 +113,29 @@ async function findById(jurorId) {
 async function createJuror(data) {
   try {
     const pool = await poolPromise;
-    const result = await pool.request()
-      .input('name', data.name)
-      .input('phoneNumber', data.phoneNumber)
-      .input('address1', data.address1)
-      .input('address2', data.address2 || null)
-      .input('city', data.city)
-      .input('state', data.state)
-      .input('zipCode', data.zipCode)
-      .input('county', data.county)
-      .input('maritalStatus', data.maritalStatus || null)
-      .input('spouseEmployer', data.spouseEmployer || null)
-      .input('employerName', data.employerName || null)
-      .input('employerAddress', data.employerAddress || null)
-      .input('yearsInCounty', data.yearsInCounty || null)
-      .input('ageRange', data.ageRange || null)
-      .input('gender', data.gender || null)
-      .input('education', data.education || null)
-      .input('paymentMethod', data.paymentMethod)
-      .input('email', data.email)
-      .input('passwordHash', data.passwordHash)
-      .input('criteriaResponses', data.criteriaResponses || null)
-      .input('userAgreementAccepted', data.userAgreementAccepted)
-      .query(`
+    const result = await pool
+      .request()
+      .input("name", data.name)
+      .input("phoneNumber", data.phoneNumber)
+      .input("address1", data.address1)
+      .input("address2", data.address2 || null)
+      .input("city", data.city)
+      .input("state", data.state)
+      .input("zipCode", data.zipCode)
+      .input("county", data.county)
+      .input("maritalStatus", data.maritalStatus || null)
+      .input("spouseEmployer", data.spouseEmployer || null)
+      .input("employerName", data.employerName || null)
+      .input("employerAddress", data.employerAddress || null)
+      .input("yearsInCounty", data.yearsInCounty || null)
+      .input("ageRange", data.ageRange || null)
+      .input("gender", data.gender || null)
+      .input("education", data.education || null)
+      .input("paymentMethod", data.paymentMethod)
+      .input("email", data.email)
+      .input("passwordHash", data.passwordHash)
+      .input("criteriaResponses", data.criteriaResponses || null)
+      .input("userAgreementAccepted", data.userAgreementAccepted).query(`
         INSERT INTO dbo.Jurors (
           Name,
           PhoneNumber,
@@ -205,10 +201,10 @@ async function createJuror(data) {
         );
         SELECT SCOPE_IDENTITY() as JurorId;
       `);
-    
+
     return result.recordset[0].JurorId;
   } catch (error) {
-    console.error('Error creating juror:', error);
+    console.error("Error creating juror:", error);
     throw error;
   }
 }
@@ -220,16 +216,14 @@ async function createJuror(data) {
 async function updateLastLogin(jurorId) {
   try {
     const pool = await poolPromise;
-    await pool.request()
-      .input('jurorId', jurorId)
-      .query(`
+    await pool.request().input("jurorId", jurorId).query(`
         UPDATE dbo.Jurors 
         SET LastLoginAt = GETUTCDATE(),
             UpdatedAt = GETUTCDATE()
         WHERE JurorId = @jurorId
       `);
   } catch (error) {
-    console.error('Error updating last login:', error);
+    console.error("Error updating last login:", error);
     throw error;
   }
 }
@@ -242,9 +236,7 @@ async function updateLastLogin(jurorId) {
 async function updateVerificationStatus(jurorId, status) {
   try {
     const pool = await poolPromise;
-    await pool.request()
-      .input('jurorId', jurorId)
-      .input('status', status)
+    await pool.request().input("jurorId", jurorId).input("status", status)
       .query(`
         UPDATE dbo.Jurors 
         SET VerificationStatus = @status,
@@ -254,7 +246,7 @@ async function updateVerificationStatus(jurorId, status) {
         WHERE JurorId = @jurorId
       `);
   } catch (error) {
-    console.error('Error updating verification status:', error);
+    console.error("Error updating verification status:", error);
     throw error;
   }
 }
@@ -268,10 +260,10 @@ async function updateVerificationStatus(jurorId, status) {
 async function updateTaskCompletion(jurorId, task, completed = true) {
   try {
     const pool = await poolPromise;
-    let query = '';
-    
+    let query = "";
+
     switch (task) {
-      case 'intro_video':
+      case "intro_video":
         query = `
           UPDATE dbo.Jurors 
           SET IntroVideoCompleted = @completed,
@@ -279,7 +271,7 @@ async function updateTaskCompletion(jurorId, task, completed = true) {
           WHERE JurorId = @jurorId
         `;
         break;
-      case 'juror_quiz':
+      case "juror_quiz":
         query = `
           UPDATE dbo.Jurors 
           SET JurorQuizCompleted = @completed,
@@ -287,7 +279,7 @@ async function updateTaskCompletion(jurorId, task, completed = true) {
           WHERE JurorId = @jurorId
         `;
         break;
-      case 'onboarding':
+      case "onboarding":
         query = `
           UPDATE dbo.Jurors 
           SET OnboardingCompleted = @completed,
@@ -296,15 +288,16 @@ async function updateTaskCompletion(jurorId, task, completed = true) {
         `;
         break;
       default:
-        throw new Error('Invalid task type');
+        throw new Error("Invalid task type");
     }
-    
-    await pool.request()
-      .input('jurorId', jurorId)
-      .input('completed', completed)
+
+    await pool
+      .request()
+      .input("jurorId", jurorId)
+      .input("completed", completed)
       .query(query);
   } catch (error) {
-    console.error('Error updating task completion:', error);
+    console.error("Error updating task completion:", error);
     throw error;
   }
 }
@@ -318,10 +311,10 @@ async function updateTaskCompletion(jurorId, task, completed = true) {
 async function getActiveJurorsByCounty(county, limit = 50) {
   try {
     const pool = await poolPromise;
-    const result = await pool.request()
-      .input('county', county)
-      .input('limit', limit)
-      .query(`
+    const result = await pool
+      .request()
+      .input("county", county)
+      .input("limit", limit).query(`
         SELECT TOP(@limit)
           JurorId,
           Name,
@@ -337,10 +330,10 @@ async function getActiveJurorsByCounty(county, limit = 50) {
           AND OnboardingCompleted = 1
         ORDER BY CreatedAt DESC
       `);
-    
+
     return result.recordset;
   } catch (error) {
-    console.error('Error getting active jurors by county:', error);
+    console.error("Error getting active jurors by county:", error);
     throw error;
   }
 }
@@ -355,11 +348,11 @@ async function getAllJurors(page = 1, limit = 10) {
   try {
     const pool = await poolPromise;
     const offset = (page - 1) * limit;
-    
-    const result = await pool.request()
-      .input('limit', limit)
-      .input('offset', offset)
-      .query(`
+
+    const result = await pool
+      .request()
+      .input("limit", limit)
+      .input("offset", offset).query(`
         SELECT 
           JurorId,
           Name,
@@ -378,16 +371,16 @@ async function getAllJurors(page = 1, limit = 10) {
         
         SELECT COUNT(*) as total FROM dbo.Jurors;
       `);
-    
+
     return {
       jurors: result.recordsets[0],
       total: result.recordsets[1][0].total,
       page,
       limit,
-      totalPages: Math.ceil(result.recordsets[1][0].total / limit)
+      totalPages: Math.ceil(result.recordsets[1][0].total / limit),
     };
   } catch (error) {
-    console.error('Error getting all jurors:', error);
+    console.error("Error getting all jurors:", error);
     throw error;
   }
 }
@@ -399,16 +392,37 @@ async function getAllJurors(page = 1, limit = 10) {
 async function deactivateJuror(jurorId) {
   try {
     const pool = await poolPromise;
-    await pool.request()
-      .input('jurorId', jurorId)
-      .query(`
+    await pool.request().input("jurorId", jurorId).query(`
         UPDATE dbo.Jurors 
         SET IsActive = 0,
             UpdatedAt = GETUTCDATE()
         WHERE JurorId = @jurorId
       `);
   } catch (error) {
-    console.error('Error deactivating juror:', error);
+    console.error("Error deactivating juror:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update juror password
+ * @param {number} jurorId - Juror ID
+ * @param {string} passwordHash - New password hash
+ */
+async function updatePassword(jurorId, passwordHash) {
+  try {
+    const pool = await poolPromise;
+    await pool
+      .request()
+      .input("jurorId", jurorId)
+      .input("passwordHash", passwordHash).query(`
+        UPDATE dbo.Jurors 
+        SET PasswordHash = @passwordHash,
+            UpdatedAt = GETUTCDATE()
+        WHERE JurorId = @jurorId
+      `);
+  } catch (error) {
+    console.error("Error updating juror password:", error);
     throw error;
   }
 }
@@ -422,5 +436,6 @@ module.exports = {
   updateTaskCompletion,
   getActiveJurorsByCounty,
   getAllJurors,
-  deactivateJuror
+  deactivateJuror,
+  updatePassword,
 };

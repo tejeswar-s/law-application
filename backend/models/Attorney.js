@@ -1,4 +1,4 @@
-const { poolPromise } = require('../config/db');
+const { poolPromise } = require("../config/db");
 
 /**
  * Find attorney by email
@@ -8,9 +8,7 @@ const { poolPromise } = require('../config/db');
 async function findByEmail(email) {
   try {
     const pool = await poolPromise;
-    const result = await pool.request()
-      .input('email', email)
-      .query(`
+    const result = await pool.request().input("email", email).query(`
         SELECT 
           AttorneyId,
           IsAttorney,
@@ -41,7 +39,7 @@ async function findByEmail(email) {
       `);
     return result.recordset[0] || null;
   } catch (error) {
-    console.error('Error finding attorney by email:', error);
+    console.error("Error finding attorney by email:", error);
     throw error;
   }
 }
@@ -54,9 +52,7 @@ async function findByEmail(email) {
 async function findById(attorneyId) {
   try {
     const pool = await poolPromise;
-    const result = await pool.request()
-      .input('attorneyId', attorneyId)
-      .query(`
+    const result = await pool.request().input("attorneyId", attorneyId).query(`
         SELECT 
           AttorneyId,
           IsAttorney,
@@ -86,7 +82,7 @@ async function findById(attorneyId) {
       `);
     return result.recordset[0] || null;
   } catch (error) {
-    console.error('Error finding attorney by ID:', error);
+    console.error("Error finding attorney by ID:", error);
     throw error;
   }
 }
@@ -99,24 +95,24 @@ async function findById(attorneyId) {
 async function createAttorney(data) {
   try {
     const pool = await poolPromise;
-    const result = await pool.request()
-      .input('isAttorney', data.isAttorney)
-      .input('firstName', data.firstName)
-      .input('middleName', data.middleName || null)
-      .input('lastName', data.lastName)
-      .input('lawFirmName', data.lawFirmName)
-      .input('phoneNumber', data.phoneNumber)
-      .input('state', data.state)
-      .input('stateBarNumber', data.stateBarNumber)
-      .input('officeAddress1', data.officeAddress1)
-      .input('officeAddress2', data.officeAddress2 || null)
-      .input('city', data.city)
-      .input('addressState', data.addressState)
-      .input('zipCode', data.zipCode)
-      .input('email', data.email)
-      .input('passwordHash', data.passwordHash)
-      .input('userAgreementAccepted', data.userAgreementAccepted)
-      .query(`
+    const result = await pool
+      .request()
+      .input("isAttorney", data.isAttorney)
+      .input("firstName", data.firstName)
+      .input("middleName", data.middleName || null)
+      .input("lastName", data.lastName)
+      .input("lawFirmName", data.lawFirmName)
+      .input("phoneNumber", data.phoneNumber)
+      .input("state", data.state)
+      .input("stateBarNumber", data.stateBarNumber)
+      .input("officeAddress1", data.officeAddress1)
+      .input("officeAddress2", data.officeAddress2 || null)
+      .input("city", data.city)
+      .input("addressState", data.addressState)
+      .input("zipCode", data.zipCode)
+      .input("email", data.email)
+      .input("passwordHash", data.passwordHash)
+      .input("userAgreementAccepted", data.userAgreementAccepted).query(`
         INSERT INTO dbo.Attorneys (
           IsAttorney,
           FirstName,
@@ -164,10 +160,10 @@ async function createAttorney(data) {
         );
         SELECT SCOPE_IDENTITY() as AttorneyId;
       `);
-    
+
     return result.recordset[0].AttorneyId;
   } catch (error) {
-    console.error('Error creating attorney:', error);
+    console.error("Error creating attorney:", error);
     throw error;
   }
 }
@@ -179,16 +175,14 @@ async function createAttorney(data) {
 async function updateLastLogin(attorneyId) {
   try {
     const pool = await poolPromise;
-    await pool.request()
-      .input('attorneyId', attorneyId)
-      .query(`
+    await pool.request().input("attorneyId", attorneyId).query(`
         UPDATE dbo.Attorneys 
         SET LastLoginAt = GETUTCDATE(),
             UpdatedAt = GETUTCDATE()
         WHERE AttorneyId = @attorneyId
       `);
   } catch (error) {
-    console.error('Error updating last login:', error);
+    console.error("Error updating last login:", error);
     throw error;
   }
 }
@@ -201,9 +195,7 @@ async function updateLastLogin(attorneyId) {
 async function updateVerificationStatus(attorneyId, status) {
   try {
     const pool = await poolPromise;
-    await pool.request()
-      .input('attorneyId', attorneyId)
-      .input('status', status)
+    await pool.request().input("attorneyId", attorneyId).input("status", status)
       .query(`
         UPDATE dbo.Attorneys 
         SET VerificationStatus = @status,
@@ -213,7 +205,7 @@ async function updateVerificationStatus(attorneyId, status) {
         WHERE AttorneyId = @attorneyId
       `);
   } catch (error) {
-    console.error('Error updating verification status:', error);
+    console.error("Error updating verification status:", error);
     throw error;
   }
 }
@@ -227,17 +219,17 @@ async function updateVerificationStatus(attorneyId, status) {
 async function checkStateBarNumberExists(stateBarNumber, state) {
   try {
     const pool = await poolPromise;
-    const result = await pool.request()
-      .input('stateBarNumber', stateBarNumber)
-      .input('state', state)
-      .query(`
+    const result = await pool
+      .request()
+      .input("stateBarNumber", stateBarNumber)
+      .input("state", state).query(`
         SELECT COUNT(*) as count 
         FROM dbo.Attorneys 
         WHERE StateBarNumber = @stateBarNumber AND State = @state
       `);
     return result.recordset[0].count > 0;
   } catch (error) {
-    console.error('Error checking state bar number:', error);
+    console.error("Error checking state bar number:", error);
     throw error;
   }
 }
@@ -252,11 +244,11 @@ async function getAllAttorneys(page = 1, limit = 10) {
   try {
     const pool = await poolPromise;
     const offset = (page - 1) * limit;
-    
-    const result = await pool.request()
-      .input('limit', limit)
-      .input('offset', offset)
-      .query(`
+
+    const result = await pool
+      .request()
+      .input("limit", limit)
+      .input("offset", offset).query(`
         SELECT 
           AttorneyId,
           FirstName,
@@ -274,16 +266,39 @@ async function getAllAttorneys(page = 1, limit = 10) {
         
         SELECT COUNT(*) as total FROM dbo.Attorneys;
       `);
-    
+
     return {
       attorneys: result.recordsets[0],
       total: result.recordsets[1][0].total,
       page,
       limit,
-      totalPages: Math.ceil(result.recordsets[1][0].total / limit)
+      totalPages: Math.ceil(result.recordsets[1][0].total / limit),
     };
   } catch (error) {
-    console.error('Error getting all attorneys:', error);
+    console.error("Error getting all attorneys:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update attorney password
+ * @param {number} attorneyId - Attorney ID
+ * @param {string} passwordHash - New password hash
+ */
+async function updatePassword(attorneyId, passwordHash) {
+  try {
+    const pool = await poolPromise;
+    await pool
+      .request()
+      .input("attorneyId", attorneyId)
+      .input("passwordHash", passwordHash).query(`
+        UPDATE dbo.Attorneys 
+        SET PasswordHash = @passwordHash,
+            UpdatedAt = GETUTCDATE()
+        WHERE AttorneyId = @attorneyId
+      `);
+  } catch (error) {
+    console.error("Error updating attorney password:", error);
     throw error;
   }
 }
@@ -295,5 +310,6 @@ module.exports = {
   updateLastLogin,
   updateVerificationStatus,
   checkStateBarNumberExists,
-  getAllAttorneys
+  getAllAttorneys,
+  updatePassword,
 };

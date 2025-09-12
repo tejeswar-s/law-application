@@ -5,17 +5,26 @@ const {
   createAttorney,
   updateLastLogin: updateAttorneyLastLogin,
   checkStateBarNumberExists,
+  updatePassword: updateAttorneyPassword,
 } = require("../models/Attorney");
 const {
   findByEmail: findJurorByEmail,
   createJuror,
   updateLastLogin: updateJurorLastLogin,
+  updatePassword: updateJurorPassword,
 } = require("../models/Juror");
 const {
   validatePassword,
   validateEmail,
   validatePhone,
 } = require("../utils/validator");
+const { sendPasswordResetEmail } = require("../utils/email");
+const {
+  createPasswordResetToken,
+  verifyPasswordResetToken,
+  markTokenAsUsed,
+  getResetAttemptCount,
+} = require("../models/PasswordReset");
 
 /**
  * Attorney Signup
@@ -275,11 +284,9 @@ async function jurorSignup(req, res) {
 
         // Check disqualifying responses
         if (criteria.age === "no") {
-          return res
-            .status(400)
-            .json({
-              message: "You must be at least 18 years old to serve as a juror",
-            });
+          return res.status(400).json({
+            message: "You must be at least 18 years old to serve as a juror",
+          });
         }
         if (criteria.citizen === "no") {
           return res
@@ -287,12 +294,10 @@ async function jurorSignup(req, res) {
             .json({ message: "You must be a US citizen to serve as a juror" });
         }
         if (criteria.indictment === "yes") {
-          return res
-            .status(400)
-            .json({
-              message:
-                "Individuals currently under indictment are not eligible to serve",
-            });
+          return res.status(400).json({
+            message:
+              "Individuals currently under indictment are not eligible to serve",
+          });
         }
       } catch (error) {
         return res
@@ -376,7 +381,6 @@ async function attorneyLogin(req, res) {
     // Find attorney by email
     const attorney = await findAttorneyByEmail(email.toLowerCase().trim());
     if (!attorney) {
-      console.log("No attorney with that email");
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
@@ -447,11 +451,9 @@ async function jurorLogin(req, res) {
 
     // Check if account is active
     if (!juror.IsActive) {
-      return res
-        .status(403)
-        .json({
-          message: "Your account has been deactivated. Please contact support.",
-        });
+      return res.status(403).json({
+        message: "Your account has been deactivated. Please contact support.",
+      });
     }
 
     // Verify password
@@ -498,6 +500,184 @@ async function jurorLogin(req, res) {
     res
       .status(500)
       .json({ message: "Internal server error. Please try again later." });
+  }
+}
+
+/**
+ * Request Password Reset
+ */
+async function requestPasswordReset(req, res) {
+  try {
+    const { email, userType } = req.body;
+
+    // Basic validation
+    if (!email || !userType) {
+      return res.status(400).json({
+        message: "Email and user type are required",
+      });
+    }
+
+    // Validate user type
+    if (!["attorney", "juror"].includes(userType)) {
+      return res.status(400).json({
+        message: "Invalid user type",
+      });
+    }
+
+    // Validate email format
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      return res.status(400).json({ message: emailValidation.error });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check if user exists
+    let user = null;
+    if (userType === "attorney") {
+      user = await findAttorneyByEmail(normalizedEmail);
+    } else {
+      user = await findJurorByEmail(normalizedEmail);
+      // Check if juror account is active
+      if (user && !user.IsActive) {
+        return res.status(403).json({
+          message: "Your account has been deactivated. Please contact support.",
+        });
+      }
+    }
+
+    // Always return success to prevent email enumeration attacks
+    // But only send email if user actually exists
+    if (user) {
+      // Check rate limiting
+      const attemptCount = await getResetAttemptCount(normalizedEmail);
+      if (attemptCount >= 3) {
+        return res.status(429).json({
+          message:
+            "Too many password reset requests. Please wait before trying again.",
+        });
+      }
+
+      // Create reset token
+      const { token } = await createPasswordResetToken(
+        normalizedEmail,
+        userType
+      );
+
+      // Send reset email
+      const emailSent = await sendPasswordResetEmail(
+        normalizedEmail,
+        token,
+        userType
+      );
+
+      if (!emailSent) {
+        console.error(
+          "Failed to send password reset email for:",
+          normalizedEmail
+        );
+      }
+    }
+
+    // Always return success message
+    res.json({
+      message:
+        "If an account with that email exists, a password reset link has been sent.",
+    });
+  } catch (error) {
+    console.error("Password reset request error:", error);
+    res.status(500).json({
+      message: "Internal server error. Please try again later.",
+    });
+  }
+}
+
+/**
+ * Reset Password
+ */
+async function resetPassword(req, res) {
+  try {
+    const { token, userType, newPassword } = req.body;
+
+    // Basic validation
+    if (!token || !userType || !newPassword) {
+      return res.status(400).json({
+        message: "Token, user type, and new password are required",
+      });
+    }
+
+    // Validate user type
+    if (!["attorney", "juror"].includes(userType)) {
+      return res.status(400).json({
+        message: "Invalid user type",
+      });
+    }
+
+    // Verify the reset token
+    const tokenData = await verifyPasswordResetToken(token, userType);
+    if (!tokenData) {
+      return res.status(400).json({
+        message: "Invalid or expired reset token",
+      });
+    }
+
+    // Find the user to get their name for password validation
+    let user = null;
+    if (userType === "attorney") {
+      user = await findAttorneyByEmail(tokenData.Email);
+    } else {
+      user = await findJurorByEmail(tokenData.Email);
+    }
+
+    if (!user) {
+      return res.status(400).json({
+        message: "User not found",
+      });
+    }
+
+    // Validate new password
+    let firstName, lastName;
+    if (userType === "attorney") {
+      firstName = user.FirstName;
+      lastName = user.LastName;
+    } else {
+      const nameParts = user.Name.split(" ");
+      firstName = nameParts[0];
+      lastName = nameParts[nameParts.length - 1];
+    }
+
+    const passwordValidation = validatePassword(
+      newPassword,
+      firstName,
+      lastName,
+      tokenData.Email
+    );
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({ message: passwordValidation.error });
+    }
+
+    // Hash new password
+    const saltRounds = 12;
+    const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password in database
+    if (userType === "attorney") {
+      await updateAttorneyPassword(user.AttorneyId, passwordHash);
+    } else {
+      await updateJurorPassword(user.JurorId, passwordHash);
+    }
+
+    // Mark token as used
+    await markTokenAsUsed(token, userType);
+
+    res.json({
+      message: "Password has been reset successfully",
+    });
+  } catch (error) {
+    console.error("Password reset error:", error);
+    res.status(500).json({
+      message: "Internal server error. Please try again later.",
+    });
   }
 }
 
@@ -567,5 +747,7 @@ module.exports = {
   jurorSignup,
   attorneyLogin,
   jurorLogin,
+  requestPasswordReset,
+  resetPassword,
   verifyToken,
 };
