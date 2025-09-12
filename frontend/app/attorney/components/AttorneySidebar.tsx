@@ -174,7 +174,7 @@ export default function AttorneySidebar() {
       {/* Sign out */}
       <div className="mb-6 px-4">
         <Link
-          href="/logout"
+          href="/login"
           className={`flex items-center ${
             collapsed ? "justify-center py-3" : "px-4 py-3 w-full gap-3"
           } rounded hover:bg-white/10 transition-colors duration-300`}

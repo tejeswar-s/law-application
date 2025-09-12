@@ -1,14 +1,17 @@
-require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+require('dotenv').config();
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const attorneyRoutes = require('./routes/attorneyRoutes');
 const jurorRoutes = require('./routes/jurorRoutes');
-
+const scheduleTrialRoutes = require("./routes/scheduleTrial");
+const warRoomTeamRoutes = require("./routes/warRoomTeamRoutes");
+const warRoomDocumentRoutes = require("./routes/warRoomDocumentRoutes");
+const warRoomVoirDireRoutes = require("./routes/warRoomVoirDireRoutes");
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
 
@@ -16,8 +19,8 @@ const errorHandler = require('./middleware/errorHandler');
 const { poolPromise } = require('./config/db');
 
 const app = express();
+const { BlobServiceClient } = require("@azure/storage-blob");
 
-// Security middleware
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -83,7 +86,11 @@ app.get('/api/health', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/attorney', attorneyRoutes);
 app.use('/api/juror', jurorRoutes);
-
+app.use('/api',scheduleTrialRoutes);
+app.use('/api', require('./routes/caseRoutes'));
+app.use("/api", warRoomTeamRoutes);
+app.use("/api", warRoomDocumentRoutes);
+app.use("/api", warRoomVoirDireRoutes);
 // Test route for database connection
 app.get('/api/test-db', async (req, res) => {
   try {
