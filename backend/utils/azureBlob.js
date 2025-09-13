@@ -15,4 +15,12 @@ async function uploadToBlob(fileBuffer, fileName, mimeType) {
   return blockBlobClient.url;
 }
 
-module.exports = { uploadToBlob };
+// Utility to get a blob client from a file URL
+function getBlobClient(fileUrl) {
+  // Extract blob name from the URL
+  const urlParts = fileUrl.split("/");
+  const blobName = urlParts[urlParts.length - 1];
+  return containerClient.getBlobClient(blobName);
+}
+
+module.exports = { uploadToBlob, getBlobClient };

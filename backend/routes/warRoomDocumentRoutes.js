@@ -2,7 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const sql = require("mssql");
 const path = require("path");
-const { uploadToBlob } = require("../utils/azureBlob");
+const { uploadToBlob,getBlobClient } = require("../utils/azureBlob");
 
 const router = express.Router();
 const upload = multer();
@@ -64,6 +64,36 @@ router.get("/cases/:caseId/documents", async (req, res) => {
     res.json(result.recordset);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete("/cases/:caseId/documents/:docId", async (req, res) => {
+  const { caseId, docId } = req.params;
+  try {
+    // 1. Get document info from DB (to get blob/file URL)
+    const doc = await sql.connect(config)
+      .then(pool => 
+        pool.request()
+          .input('docId', sql.Int, docId)
+          .query('SELECT * FROM WarRoomDocuments WHERE Id = @docId')
+      )
+      .then(result => result.recordset[0]);
+
+    if (!doc) return res.status(404).json({ error: "Document not found" });
+
+    // 2. Delete from blob storage
+    const blobClient = getBlobClient(doc.FileUrl);
+    await blobClient.deleteIfExists(); // <-- Correct Azure SDK method
+
+    // 3. Delete from database
+    await sql.connect(config);
+    await sql.query`
+      DELETE FROM WarRoomDocuments WHERE Id = ${docId}
+    `;
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message || "Delete failed" });
   }
 });
 

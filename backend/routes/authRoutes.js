@@ -1,3 +1,5 @@
+const express = require("express");
+const router = express.Router();
 const rateLimit = require("express-rate-limit");
 const {
   attorneySignup,
@@ -9,8 +11,6 @@ const {
   resetPassword,
 } = require("../controllers/authController");
 const { authMiddleware } = require("../middleware/authMiddleware");
-
-const router = express.Router();
 
 // Rate limiting for auth endpoints
 const authLimiter = rateLimit({
