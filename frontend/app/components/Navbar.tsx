@@ -30,8 +30,8 @@ const Navbar: FC = () => {
           <Link href="#" className="hover:underline">
             About QV
           </Link>
-          <Link href="#" className="hover:underline">
-            Contact
+          <Link href="/contact" className="text-[#0A2342] hover:text-[#1a3666]">
+            Contact Us
           </Link>
           <Link
             href="/signup"

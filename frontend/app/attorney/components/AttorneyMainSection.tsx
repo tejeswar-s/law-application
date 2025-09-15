@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+const AttorneyHelp = dynamic(() => import("./AttorneyHelp"), { ssr: false });
+const AttorneyContact = dynamic(() => import("./AttorneyContact"), { ssr: false });
 import { differenceInMinutes, format, parseISO, isToday } from "date-fns";
 import { useRouter } from "next/navigation";
 
@@ -89,6 +92,8 @@ export default function AttorneyMainSection() {
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
   const [eventView, setEventView] = useState<"calendar" | "list">("list");
+  const [showHelp, setShowHelp] = useState(false);
+  const [showContact, setShowContact] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -119,18 +124,23 @@ export default function AttorneyMainSection() {
   const grouped = groupCasesByDate(cases);
   const sortedDates = Object.keys(grouped).sort();
 
+  if (showContact) {
+    return <AttorneyContact onBack={() => { setShowContact(false); setShowHelp(true); }} />;
+  }
+  if (showHelp) {
+    return <AttorneyHelp onContact={() => { setShowHelp(false); setShowContact(true); }} />;
+  }
   return (
-    <main className="flex-1 px-10 py-8 bg-[#F7F6F3]">
+    <main className="flex-1 px-10 py-8 bg-[#F7F6F3] transition-all duration-300 ease-in-out">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-[#16305B]">
           Welcome back{user ? `, ${user.firstName}!` : "!"}
         </h1>
         <div className="flex items-center gap-4">
-          <button className="text-[#16305B] hover:underline">Help</button>
+          <button className="text-[#16305B]" onClick={() => setShowHelp(true)}>Help</button>
         </div>
       </div>
-
       {/* Your Cases Section */}
       <section className="mb-8">
         <div className="flex justify-between items-center mb-2">
