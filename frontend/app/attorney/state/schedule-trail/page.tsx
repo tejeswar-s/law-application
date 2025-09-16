@@ -2,6 +2,16 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+
+// Buffering animation component
+function BufferingAnimation() {
+  return (
+    <div className="flex items-center justify-center">
+      <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#16305B]"></div>
+    </div>
+  );
+}
 
 const availableDates = ["23", "24", "25", "26", "29", "30"];
 const timeSlots = [
@@ -35,6 +45,8 @@ export default function ScheduleTrialPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [scheduled, setScheduled] = useState(false);
+  const [redirecting, setRedirecting] = useState(false); // <-- Add this state
+  const router = useRouter(); // <-- Initialize router
 
   const handleDateSelect = (date: string) => {
     setSelectedDate(date);
@@ -52,6 +64,7 @@ export default function ScheduleTrialPage() {
   };
 
   const handleComplete = async () => {
+    setRedirecting(true); // <-- Show animation
     const user = JSON.parse(localStorage.getItem("attorneyUser") || "{}");
 
     const caseDetails = {
@@ -63,25 +76,24 @@ export default function ScheduleTrialPage() {
       paymentAmount: localStorage.getItem("paymentAmount"),
       plaintiffGroups: JSON.parse(localStorage.getItem("plaintiffGroups") || "[]"),
       defendantGroups: JSON.parse(localStorage.getItem("defendantGroups") || "[]"),
-      scheduledDate: `2025-08-${selectedDate.padStart(2, "0")}`,  // ✅ FIX
-        scheduledTime: selectedTime + ":00",                 
+      scheduledDate: `2025-08-${selectedDate.padStart(2, "0")}`,
+      scheduledTime: selectedTime + ":00",
       name,
       email,
     };
-    console.log({
-  county: localStorage.getItem("county"),
-  caseType: localStorage.getItem("caseType"),
-  // ...etc
-});
 
     await fetch("http://localhost:4000/api/schedule-trial", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...caseDetails,
-        UserId: user.email, // or user.id if you have it
+        UserId: user.email,
       }),
     });
+
+    setTimeout(() => {
+      router.push("/attorney"); // <-- Redirect after short delay
+    }, 1800); // 1.8 seconds for animation
   };
 
   return (
@@ -336,6 +348,14 @@ export default function ScheduleTrialPage() {
                   </>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+        {redirecting && (
+          <div className="flex flex-col items-center justify-center w-full h-screen">
+            <BufferingAnimation />
+            <div className="mt-6 text-[#16305B] text-lg font-semibold">
+              Opening dashboard...
             </div>
           </div>
         )}

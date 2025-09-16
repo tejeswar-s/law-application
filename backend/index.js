@@ -12,6 +12,7 @@ const scheduleTrialRoutes = require("./routes/scheduleTrial");
 const warRoomTeamRoutes = require("./routes/warRoomTeamRoutes");
 const warRoomDocumentRoutes = require("./routes/warRoomDocumentRoutes");
 const warRoomVoirDireRoutes = require("./routes/warRoomVoirDireRoutes");
+const warRoomInfoRoutes = require("./routes/warRoomInfoRoutes"); // <-- Add this import
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
 
@@ -91,6 +92,7 @@ app.use('/api', require('./routes/caseRoutes'));
 app.use("/api", warRoomTeamRoutes);
 app.use("/api", warRoomDocumentRoutes);
 app.use("/api", warRoomVoirDireRoutes);
+app.use("/api", warRoomInfoRoutes); // <-- Add this line after other app.use("/api", ...) routes
 // Test route for database connection
 app.get('/api/test-db', async (req, res) => {
   try {
