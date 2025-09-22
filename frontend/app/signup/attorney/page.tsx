@@ -1,6 +1,7 @@
+"use client";
+
 export const ssr = false;
 
-"use client";
 import React from 'react';
 import { useState, useEffect, useRef } from "react";
 // import { states, countiesByState, citiesByCounty } from "./data/usLocations";

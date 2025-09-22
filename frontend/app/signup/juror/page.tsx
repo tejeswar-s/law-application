@@ -1,6 +1,6 @@
-export const ssr = false;
-
 "use client";
+
+export const ssr = false;
 
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import type { FC, FormEvent } from "react";
