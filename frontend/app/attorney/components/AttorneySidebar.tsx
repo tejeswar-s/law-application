@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Image from "next/image";
-
 import { useRouter } from "next/navigation";
 import LogoutOverlay from "../../juror/components/LogoutOverlay";
 import {
@@ -15,20 +14,22 @@ import {
   ArrowLeft,
   ArrowRight,
 } from "lucide-react";
+import { Section } from "../types";   // ✅ Import Section type
 
 const NAV_BG = "#16305B";
 const ACTIVE_BG = "#F7F6F3";
 const ACTIVE_TEXT = "#16305B";
 const TEXT_COLOR = "white";
 
-type Section = "home" | "profile" | "notifications" | "cases" | "calendar";
-
 interface AttorneySidebarProps {
   selectedSection: Section;
   onSectionChange: (section: Section) => void;
 }
 
-export default function AttorneySidebar({ selectedSection, onSectionChange }: AttorneySidebarProps) {
+export default function AttorneySidebar({
+  selectedSection,
+  onSectionChange,
+}: AttorneySidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
   const router = useRouter();
