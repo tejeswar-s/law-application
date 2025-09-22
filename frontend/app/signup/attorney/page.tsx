@@ -2,7 +2,7 @@
 
 export const ssr = false;
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { useState, useEffect, useRef } from "react";
 // import { states, countiesByState, citiesByCounty } from "./data/usLocations";
 import Link from "next/link";
@@ -10,7 +10,7 @@ import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
-export default function AttorneySignup() {
+function AttorneySignupInner() {
   useEffect(() => {
     console.log("AttorneySignup component mounted — current step:", step);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1327,5 +1327,13 @@ export default function AttorneySignup() {
         )}
       </section>
     </div>
+  );
+}
+
+export default function AttorneySignup() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AttorneySignupInner />
+    </Suspense>
   );
 }

@@ -2,7 +2,7 @@
 
 export const ssr = false;
 
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { Suspense, useMemo, useState, useRef, useEffect } from "react";
 import type { FC, FormEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -65,7 +65,7 @@ type PwChecks = {
   all: boolean;
 };
 
-export default function SignupFlow() {
+function SignupFlow() {
   // Steps
   const [step, setStep] = useState<Step>(1);
   const [personalSubStep, setPersonalSubStep] = useState<PersonalSubStep>(1);
@@ -1583,3 +1583,11 @@ const Checklist: FC<{ items: ChecklistItem[] }> = ({ items }) => {
     </ul>
   );
 };
+
+export default function SignupFlowWrapper() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SignupFlow />
+    </Suspense>
+  );
+}
