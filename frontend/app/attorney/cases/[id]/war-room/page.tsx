@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 type TeamMember = { name: string; role: string; email: string };
-type Document = { name: string; description: string; fileUrl?: string };
+type Document = {
+  id: number; name: string; description: string; fileUrl?: string 
+};
 type VoirDire = { question: string; response: string; addedBy: string };
 
 type CaseData = {
@@ -127,7 +129,9 @@ export default function WarRoomPage() {
   // --- UI ---
   return (
     <div className="flex min-h-screen bg-[#F7F6F3]">
-      <AttorneySidebar />
+      <AttorneySidebar selectedSection={"home"} onSectionChange={function (section: "home" | "cases" | "calendar" | "profile" | "notifications"): void {
+        throw new Error("Function not implemented.");
+      } } />
       <div className="flex-1 relative">
         {/* Main Content */}
         <div className="max-w-4xl mx-auto pt-8 pb-16 px-2">
