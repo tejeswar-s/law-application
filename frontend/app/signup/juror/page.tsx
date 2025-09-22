@@ -63,6 +63,8 @@ type PwChecks = {
   all: boolean;
 };
 
+export const ssr = false;
+
 export default function SignupFlow() {
   // Steps
   const [step, setStep] = useState<Step>(1);
