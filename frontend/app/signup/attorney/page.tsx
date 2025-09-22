@@ -7,6 +7,8 @@ import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
+export const ssr = false;
+
 export default function AttorneySignup() {
   useEffect(() => {
     console.log("AttorneySignup component mounted — current step:", step);
