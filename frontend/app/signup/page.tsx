@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { Gavel, Users } from "lucide-react";
 import Footer from "../components/Footer";
