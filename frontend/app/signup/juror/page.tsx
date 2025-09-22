@@ -1,3 +1,5 @@
+export const ssr = false;
+
 "use client";
 
 import React, { useMemo, useState, useRef, useEffect } from "react";
@@ -62,8 +64,6 @@ type PwChecks = {
   confirmMatch: boolean;
   all: boolean;
 };
-
-export const ssr = false;
 
 export default function SignupFlow() {
   // Steps

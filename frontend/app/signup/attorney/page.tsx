@@ -1,3 +1,5 @@
+export const ssr = false;
+
 "use client";
 import React from 'react';
 import { useState, useEffect, useRef } from "react";
@@ -6,8 +8,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-
-export const ssr = false;
 
 export default function AttorneySignup() {
   useEffect(() => {
