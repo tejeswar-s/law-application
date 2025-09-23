@@ -2,19 +2,19 @@ const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 require('dotenv').config();
+
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const attorneyRoutes = require('./routes/attorneyRoutes');
 const jurorRoutes = require('./routes/jurorRoutes');
-const scheduleTrialRoutes = require("./routes/scheduleTrial");
-const warRoomTeamRoutes = require("./routes/warRoomTeamRoutes");
-const warRoomDocumentRoutes = require("./routes/warRoomDocumentRoutes");
-const warRoomVoirDireRoutes = require("./routes/warRoomVoirDireRoutes");
-const warRoomInfoRoutes = require("./routes/warRoomInfoRoutes"); // <-- Add this import
-// Import middleware
+const scheduleTrialRoutes = require('./routes/scheduleTrial');
+const warRoomTeamRoutes = require('./routes/warRoomTeamRoutes');
+const warRoomDocumentRoutes = require('./routes/warRoomDocumentRoutes');
+const warRoomVoirDireRoutes = require('./routes/warRoomVoirDireRoutes');
+const warRoomInfoRoutes = require('./routes/warRoomInfoRoutes');
 const errorHandler = require('./middleware/errorHandler');
-// Import database connection
 const { poolPromise } = require('./config/db');
 const app = express();
 const { BlobServiceClient } = require("@azure/storage-blob");
@@ -45,21 +45,17 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Global rate limiting
 const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
+  windowMs: 15 * 60 * 1000,
   max: 1000,
-  message: {
-    error: 'Too many requests from this IP, please try again later.'
-  },
+  message: { error: 'Too many requests from this IP, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req, res) => res.statusCode < 400,
 });
 app.use('/api', globalLimiter);
 
-// ----- Root Route -----
-app.get('/', (req, res) => {
-  res.send('API server running. See /api/health for status.');
-});
+// Serve static homepage and assets from "public"
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Health check endpoint
 app.get('/api/health', async (req, res) => {
@@ -155,7 +151,6 @@ async function startServer() {
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
     });
-    // Graceful shutdown
     process.on('SIGTERM', () => {
       console.log('SIGTERM received. Shutting down gracefully...');
       server.close(() => {
@@ -175,8 +170,6 @@ async function startServer() {
     process.exit(1);
   }
 }
-
-// Error and exit handlers
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
@@ -186,5 +179,4 @@ process.on('uncaughtException', (error) => {
   process.exit(1);
 });
 
-// Start the server
 startServer();
