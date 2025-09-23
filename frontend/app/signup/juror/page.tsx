@@ -12,6 +12,7 @@ import { useSearchParams } from "next/navigation";
 const BLUE = "#0A2342";
 const PAGE_BG = "#f9f7f2";
 const TICK_YELLOW = "#F6E27F";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 type AuthSubStep = 1 | 2;
@@ -140,7 +141,7 @@ function SignupFlow() {
   useEffect(() => {
     async function fetchStates() {
       try {
-        const res = await fetch('https://api.census.gov/data/2020/dec/pl?get=NAME&for=state:*');
+        const res = await fetch(`https://api.census.gov/data/2020/dec/pl?get=NAME&for=state:*`);
         const data = await res.json();
         // Remove header row and map to label/value
         setAvailableStates(data.slice(1).map((row: [string, string]) => {
@@ -281,7 +282,7 @@ function SignupFlow() {
     if (!verifyToken) return;
     (async () => {
       try {
-        const res = await fetch(`http://localhost:4000/api/auth/verify-email-token?token=${encodeURIComponent(verifyToken)}`);
+        const res = await fetch(`${API_BASE}/api/auth/verify-email-token?token=${encodeURIComponent(verifyToken)}`);
         const data = await res.json();
         if (res.ok && data?.ok) {
           setStep(4);
@@ -477,7 +478,7 @@ function SignupFlow() {
           try {
             setEmailCheckLoading(true);
             // Send verification email (no third-party existence check)
-            const res2 = await fetch("http://localhost:4000/api/auth/juror/send-email-verification", {
+            const res2 = await fetch(`${API_BASE}/api/auth/juror/send-email-verification`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ email }),
@@ -555,7 +556,7 @@ function SignupFlow() {
           userAgreementAccepted: agreed
         };
 
-        const response = await fetch("http://localhost:4000/api/auth/juror/signup", {
+        const response = await fetch(`${API_BASE}/api/auth/juror/signup`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formData),

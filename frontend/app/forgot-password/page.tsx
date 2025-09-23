@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 
 const BLUE = "#0A2342";
 const BG = "#FAF9F6";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 type Step = 'request' | 'sent';
 
@@ -24,7 +25,7 @@ export default function ForgotPassword() {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:4000/api/auth/request-password-reset", {
+      const res = await fetch(`${API_BASE}/api/auth/request-password-reset`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, userType }),
@@ -53,7 +54,7 @@ export default function ForgotPassword() {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:4000/api/auth/request-password-reset", {
+      const res = await fetch(`${API_BASE}/api/auth/request-password-reset`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, userType }),

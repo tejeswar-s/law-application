@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 // Buffering animation component
 function BufferingAnimation() {
@@ -82,7 +83,7 @@ export default function ScheduleTrialPage() {
       email,
     };
 
-    await fetch("http://localhost:4000/api/schedule-trial", {
+    await fetch(`${API_BASE}/api/schedule-trial`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

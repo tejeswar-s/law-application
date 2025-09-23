@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Eye, EyeOff, HelpCircle, X } from "lucide-react";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 type Attorney = {
   id: string;
@@ -35,7 +36,7 @@ export default function AttorneyProfileSection() {
           const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
           token = match ? decodeURIComponent(match[1]) : null;
         }
-        const res = await fetch("http://localhost:4000/api/attorney/profile", {
+        const res = await fetch(`${API_BASE}/api/attorney/profile`, {
           method: "GET",
           headers: {
             "Authorization": token ? `Bearer ${token}` : "",
@@ -77,7 +78,7 @@ export default function AttorneyProfileSection() {
         token = match ? decodeURIComponent(match[1]) : null;
       }
 
-      const res = await fetch("http://localhost:4000/api/attorney/profile", {
+      const res = await fetch(`${API_BASE}/api/attorney/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -116,7 +117,7 @@ export default function AttorneyProfileSection() {
         token = match ? decodeURIComponent(match[1]) : null;
       }
 
-      const res = await fetch("http://localhost:4000/api/attorney/profile", {
+      const res = await fetch(`${API_BASE}/api/attorney/profile`, {
         method: "DELETE",
         headers: {
           "Authorization": token ? `Bearer ${token}` : "",

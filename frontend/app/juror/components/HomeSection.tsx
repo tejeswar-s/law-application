@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import VideoIntroOverlay from "./VideoIntroOverlay";
 import JurorQuizOverlay from "./JurorQuizOverlay";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 type Juror = {
   id: string;
@@ -44,7 +45,7 @@ export default function HomeSection({ sidebarCollapsed }: { sidebarCollapsed: bo
           const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
           token = match ? decodeURIComponent(match[1]) : null;
         }
-        const res = await fetch("http://localhost:4000/api/juror/profile", {
+        const res = await fetch(`${API_BASE}/api/juror/profile`, {
           method: "GET",
           headers: {
             "Authorization": token ? `Bearer ${token}` : "",
@@ -70,7 +71,7 @@ export default function HomeSection({ sidebarCollapsed }: { sidebarCollapsed: bo
     // Fetch attorney cases for job board
     const fetchJobs = async () => {
       try {
-        const res = await fetch("http://localhost:4000/api/cases");
+        const res = await fetch(`${API_BASE}/api/cases`);
         const data = await res.json();
         const cases = Array.isArray(data) ? data : (Array.isArray(data.recordset) ? data.recordset : []);
         setJobs(cases.map((c: any) => ({
@@ -136,7 +137,7 @@ export default function HomeSection({ sidebarCollapsed }: { sidebarCollapsed: bo
             const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
             token = match ? decodeURIComponent(match[1]) : null;
           }
-          await fetch("http://localhost:4000/api/juror/profile/qualified", {
+          await fetch(`${API_BASE}/api/juror/profile/qualified`, {
             method: "POST",
             headers: {
               "Authorization": token ? `Bearer ${token}` : "",

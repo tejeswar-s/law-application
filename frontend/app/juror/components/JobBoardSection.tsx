@@ -11,6 +11,7 @@ import {
   AdjustmentsVerticalIcon,
 } from "@heroicons/react/24/solid";
 import { useEffect, useState } from "react";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function JobBoardSection() {
   const [jobs, setJobs] = useState<any[]>([]);
@@ -21,7 +22,7 @@ export default function JobBoardSection() {
     // Fetch attorney cases for job board
     const fetchJobs = async () => {
       try {
-        const res = await fetch("http://localhost:4000/api/cases");
+        const res = await fetch(`${API_BASE}/api/cases`);
         const data = await res.json();
         const cases = Array.isArray(data) ? data : (Array.isArray(data.recordset) ? data.recordset : []);
         setJobs(cases.map((c: any) => ({

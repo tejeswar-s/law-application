@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Eye, EyeOff, HelpCircle, X } from "lucide-react";
 import { SiVenmo, SiCashapp } from "react-icons/si";
 import { FaPaypal } from "react-icons/fa";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 
 type Juror = {
@@ -38,7 +39,7 @@ export default function ProfileSection() {
           const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
           token = match ? decodeURIComponent(match[1]) : null;
         }
-        const res = await fetch("http://localhost:4000/api/juror/profile", {
+        const res = await fetch(`${API_BASE}/api/juror/profile`, {
           method: "GET",
           headers: {
             "Authorization": token ? `Bearer ${token}` : "",
@@ -98,7 +99,7 @@ export default function ProfileSection() {
         setUpdating(false);
       }, 1500);
 
-        const res = await fetch("http://localhost:4000/api/juror/profile", {
+        const res = await fetch(`${API_BASE}/api/juror/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -146,7 +147,7 @@ export default function ProfileSection() {
         setDeleting(false);
       }, 1500);
 
-      const res = await fetch("http://localhost:4000/api/juror/profile", {
+      const res = await fetch(`${API_BASE}/api/juror/profile`, {
         method: "DELETE",
         headers: {
           "Authorization": token ? `Bearer ${token}` : "",

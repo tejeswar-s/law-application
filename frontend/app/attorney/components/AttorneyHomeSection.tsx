@@ -6,6 +6,7 @@ const AttorneyHelp = dynamic(() => import("./AttorneyHelp"), { ssr: false });
 const AttorneyContact = dynamic(() => import("./AttorneyContact"), { ssr: false });
 import { differenceInMinutes, format, parseISO, isToday } from "date-fns";
 import { useRouter } from "next/navigation";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 type AttorneyUser = {
   firstName: string;
@@ -107,7 +108,7 @@ export default function AttorneyHomeSection() {
     if (user) {
       setLoading(true);
       // Use user.email here, no need to redeclare user
-      fetch(`http://localhost:4000/api/cases?userId=${encodeURIComponent(user.email)}`)
+      fetch(`${API_BASE}/api/cases?userId=${encodeURIComponent(user.email)}`)
         .then(res => res.json())
         .then(data => setCases(data))
         .catch(err => {

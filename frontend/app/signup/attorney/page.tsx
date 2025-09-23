@@ -10,6 +10,8 @@ import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+
 function AttorneySignupInner() {
   useEffect(() => {
     console.log("AttorneySignup component mounted — current step:", step);
@@ -76,7 +78,7 @@ function AttorneySignupInner() {
   useEffect(() => {
     async function fetchStates() {
       try {
-        const res = await fetch('https://api.census.gov/data/2020/dec/pl?get=NAME&for=state:*');
+        const res = await fetch(`https://api.census.gov/data/2020/dec/pl?get=NAME&for=state:*`);
         const data = await res.json();
         // Remove header row and map to label/value
         setAvailableStates(data.slice(1).map((row: [string, string]) => {
@@ -323,7 +325,7 @@ function AttorneySignupInner() {
         
         const payload = JSON.stringify(payloadObj);
         console.log("Submitting attorney signup payload:", payload);
-        const res = await fetch("http://localhost:4000/api/auth/attorney/signup", {
+        const res = await fetch(`${API_BASE}/api/auth/attorney/signup`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: payload,
@@ -355,7 +357,7 @@ function AttorneySignupInner() {
         try { localStorage.setItem("attorneySignupDraft", JSON.stringify(form)); } catch (e) { /* ignore */ }
         const verificationPayload = { email: form.email };
         console.log("Verification payload:", JSON.stringify(verificationPayload));
-        const res = await fetch("http://localhost:4000/api/auth/attorney/send-email-verification", {
+        const res = await fetch(`${API_BASE}/api/auth/attorney/send-email-verification`, {
            method: "POST",
            headers: { "Content-Type": "application/json" },
            body: JSON.stringify(verificationPayload),
@@ -406,7 +408,7 @@ function AttorneySignupInner() {
     if (!verifyToken) return;
     (async () => {
       try {
-        const res = await fetch(`http://localhost:4000/api/auth/verify-email-token?token=${encodeURIComponent(verifyToken)}`);
+        const res = await fetch(`${API_BASE}/api/auth/verify-email-token?token=${encodeURIComponent(verifyToken)}`);
         const data = await res.json();
         if (data.ok) {
           let draft = {};
