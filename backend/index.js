@@ -20,11 +20,18 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'", // allow inline scripts
+          "'unsafe-eval'", // needed for Next.js runtime in dev/prod builds
+        ],
         imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'", "https:", "ws:"], // for HMR & APIs
+        fontSrc: ["'self'", "https:", "data:"],
       },
     },
+    crossOriginEmbedderPolicy: false, // needed for Next.js
   })
 );
 
