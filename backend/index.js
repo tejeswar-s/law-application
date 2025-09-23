@@ -3,7 +3,6 @@ const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
-
 // Import routes
 const authRoutes = require('./routes/authRoutes');
 const attorneyRoutes = require('./routes/attorneyRoutes');
@@ -15,13 +14,12 @@ const warRoomVoirDireRoutes = require("./routes/warRoomVoirDireRoutes");
 const warRoomInfoRoutes = require("./routes/warRoomInfoRoutes"); // <-- Add this import
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
-
 // Import database connection
 const { poolPromise } = require('./config/db');
-
 const app = express();
 const { BlobServiceClient } = require("@azure/storage-blob");
 
+// Security Headers
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -48,24 +46,26 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Global rate limiting
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // limit each IP to 1000 requests per windowMs
+  max: 1000,
   message: {
     error: 'Too many requests from this IP, please try again later.'
   },
   standardHeaders: true,
   legacyHeaders: false,
-  // Skip successful requests to static assets
   skip: (req, res) => res.statusCode < 400,
 });
-
 app.use('/api', globalLimiter);
+
+// ----- Root Route -----
+app.get('/', (req, res) => {
+  res.send('API server running. See /api/health for status.');
+});
 
 // Health check endpoint
 app.get('/api/health', async (req, res) => {
   try {
     const pool = await poolPromise;
     await pool.request().query('SELECT 1 as test');
-    
     res.json({
       status: 'OK',
       timestamp: new Date().toISOString(),
@@ -87,13 +87,14 @@ app.get('/api/health', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/attorney', attorneyRoutes);
 app.use('/api/juror', jurorRoutes);
-app.use('/api',scheduleTrialRoutes);
+app.use('/api', scheduleTrialRoutes);
 app.use('/api', require('./routes/caseRoutes'));
-app.use("/api", warRoomTeamRoutes);
-app.use("/api", warRoomDocumentRoutes);
-app.use("/api", warRoomVoirDireRoutes);
-app.use("/api", warRoomInfoRoutes); // <-- Add this line after other app.use("/api", ...) routes
-// Test route for database connection
+app.use('/api', warRoomTeamRoutes);
+app.use('/api', warRoomDocumentRoutes);
+app.use('/api', warRoomVoirDireRoutes);
+app.use('/api', warRoomInfoRoutes);
+
+// Test database connection route
 app.get('/api/test-db', async (req, res) => {
   try {
     const pool = await poolPromise;
@@ -112,7 +113,7 @@ app.get('/api/test-db', async (req, res) => {
   }
 });
 
-// Test route for existing TestDump table (if exists)
+// TestDump table route
 app.get('/api/test-dump', async (req, res) => {
   try {
     const pool = await poolPromise;
@@ -140,25 +141,21 @@ app.use('/api', (req, res) => {
   });
 });
 
-// Global error handler (should be last middleware)
+// Global error handler
 app.use(errorHandler);
 
-// Initialize database connection and start server
+// Start server
 async function startServer() {
   try {
-    // Test database connection
     await poolPromise;
     console.log('✅ Database connection established successfully');
-    
     const PORT = process.env.PORT || 4000;
-    
     const server = app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
     });
-
-    // Graceful shutdown handling
+    // Graceful shutdown
     process.on('SIGTERM', () => {
       console.log('SIGTERM received. Shutting down gracefully...');
       server.close(() => {
@@ -166,7 +163,6 @@ async function startServer() {
         process.exit(0);
       });
     });
-
     process.on('SIGINT', () => {
       console.log('SIGINT received. Shutting down gracefully...');
       server.close(() => {
@@ -174,20 +170,17 @@ async function startServer() {
         process.exit(0);
       });
     });
-
   } catch (error) {
     console.error('❌ Failed to start server:', error.message);
     process.exit(1);
   }
 }
 
-// Handle unhandled promise rejections
+// Error and exit handlers
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
   process.exit(1);
 });
-
-// Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
   process.exit(1);
