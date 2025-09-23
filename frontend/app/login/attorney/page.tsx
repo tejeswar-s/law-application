@@ -8,6 +8,7 @@ import { Eye, EyeOff } from "lucide-react";
 
 const BLUE = "#0A2342";
 const BG = "#FAF9F6";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function AttorneyLogin() {
   const [showPassword, setShowPassword] = useState(false);
@@ -24,7 +25,7 @@ export default function AttorneyLogin() {
       .find(p => p.startsWith("token="))
       ?.split("=")[1];
     if (!token) return;
-    fetch("http://localhost:4000/api/auth/verify-token", {
+    fetch(`${API_BASE}/api/auth/verify-token`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -42,7 +43,7 @@ export default function AttorneyLogin() {
     setError(null);
 
     try {
-      const res = await fetch("http://localhost:4000/api/auth/attorney/login", {
+      const res = await fetch(`${API_BASE}/api/auth/attorney/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),

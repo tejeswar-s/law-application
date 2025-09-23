@@ -8,6 +8,7 @@ import { Eye, EyeOff } from "lucide-react";
 
 const BLUE = "#0A2342";
 const BG = "#FAF9F6";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function JurorLogin() {
   const [showPassword, setShowPassword] = useState(false);
@@ -26,7 +27,7 @@ export default function JurorLogin() {
       ?.split("=")[1];
     if (!token) return;
     // Optimistic client-side redirect; optionally verify with backend
-    fetch("http://localhost:4000/api/auth/verify-token", {
+    fetch(`${API_BASE}/api/auth/verify-token`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
     })
@@ -46,7 +47,7 @@ export default function JurorLogin() {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:4000/api/auth/juror/login", {
+      const res = await fetch(`${API_BASE}/api/auth/juror/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password })
