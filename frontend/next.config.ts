@@ -1,16 +1,13 @@
-// next.config.ts
-const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
   experimental: {
-    turbopack: {
-      root: "./frontend",
-    },
+    // no turbopack field, just standard build
+    turbo: true
   },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  output: "standalone" // ensures production build works with Node server
 };
 
 export default nextConfig;

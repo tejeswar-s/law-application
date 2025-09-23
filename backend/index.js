@@ -1,182 +1,95 @@
-const express = require('express');
-const helmet = require('helmet');
-const cors = require('cors');
-const rateLimit = require('express-rate-limit');
-const path = require('path');
-require('dotenv').config();
+const express = require("express");
+const helmet = require("helmet");
+const cors = require("cors");
+const rateLimit = require("express-rate-limit");
+const path = require("path");
+const { poolPromise } = require("./config/db");
+require("dotenv").config();
 
-// Import routes
-const authRoutes = require('./routes/authRoutes');
-const attorneyRoutes = require('./routes/attorneyRoutes');
-const jurorRoutes = require('./routes/jurorRoutes');
-const scheduleTrialRoutes = require("./routes/scheduleTrial");
-const warRoomTeamRoutes = require("./routes/warRoomTeamRoutes");
-const warRoomDocumentRoutes = require("./routes/warRoomDocumentRoutes");
-const warRoomVoirDireRoutes = require("./routes/warRoomVoirDireRoutes");
-const warRoomInfoRoutes = require("./routes/warRoomInfoRoutes");
-const errorHandler = require('./middleware/errorHandler');
-const { poolPromise } = require('./config/db');
+// Next.js integration
+const next = require("next");
+const dev = process.env.NODE_ENV !== "production";
+const nextApp = next({ dev, dir: path.join(__dirname, "../frontend") });
+const handle = nextApp.getRequestHandler();
+
 const app = express();
-const { BlobServiceClient } = require("@azure/storage-blob");
 
-// Security Headers
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "https:"],
+// ===== Security =====
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'"],
+        imgSrc: ["'self'", "data:", "https:"],
+      },
     },
-  },
-}));
+  })
+);
 
-// CORS configuration
-app.use(cors({ 
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000', 
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// ===== CORS =====
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "*", // allow frontend hosted together
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// ===== Middleware =====
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
-// Global rate limiting
+// ===== Rate Limit =====
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000,
-  message: { error: 'Too many requests from this IP, please try again later.' },
+  message: { error: "Too many requests from this IP, please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req, res) => res.statusCode < 400,
 });
-app.use('/api', globalLimiter);
+app.use("/api", globalLimiter);
 
-// Serve static homepage and assets from "public"
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Health check endpoint
-app.get('/api/health', async (req, res) => {
+// ===== Routes =====
+app.get("/api/health", async (req, res) => {
   try {
     const pool = await poolPromise;
-    await pool.request().query('SELECT 1 as test');
+    await pool.request().query("SELECT 1 as test");
     res.json({
-      status: 'OK',
+      status: "OK",
       timestamp: new Date().toISOString(),
-      database: 'connected',
-      environment: process.env.NODE_ENV || 'development'
-    });
-  } catch (error) {
-    console.error('Health check failed:', error);
-    res.status(500).json({
-      status: 'ERROR',
-      timestamp: new Date().toISOString(),
-      database: 'disconnected',
-      error: 'Database connection failed'
-    });
-  }
-});
-
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/attorney', attorneyRoutes);
-app.use('/api/juror', jurorRoutes);
-app.use('/api', scheduleTrialRoutes);
-app.use('/api', require('./routes/caseRoutes'));
-app.use('/api', warRoomTeamRoutes);
-app.use('/api', warRoomDocumentRoutes);
-app.use('/api', warRoomVoirDireRoutes);
-app.use('/api', warRoomInfoRoutes);
-
-// Test database connection route
-app.get('/api/test-db', async (req, res) => {
-  try {
-    const pool = await poolPromise;
-    const result = await pool.request().query('SELECT @@VERSION as version, GETDATE() as currentTime');
-    res.json({
-      success: true,
-      database: result.recordset[0]
+      database: "connected",
+      environment: process.env.NODE_ENV || "development",
     });
   } catch (err) {
-    console.error('Database test error:', err);
-    res.status(500).json({ 
-      success: false,
-      error: 'Database connection failed',
-      message: err.message 
-    });
+    res.status(500).json({ status: "ERROR", error: err.message });
   }
 });
 
-// TestDump table route
-app.get('/api/test-dump', async (req, res) => {
-  try {
-    const pool = await poolPromise;
-    const result = await pool.request().query('SELECT TOP 10 * FROM TestDump');
-    res.json({
-      success: true,
-      data: result.recordset
-    });
-  } catch (err) {
-    console.error('TestDump query error:', err);
-    res.status(500).json({ 
-      success: false,
-      error: 'Error fetching from TestDump table',
-      message: err.message 
-    });
-  }
-});
+// Import routers
+app.use("/api/auth", require("./routes/authRoutes"));
+app.use("/api/attorney", require("./routes/attorneyRoutes"));
+app.use("/api/juror", require("./routes/jurorRoutes"));
+app.use("/api", require("./routes/caseRoutes"));
+app.use("/api", require("./routes/scheduleTrial"));
+app.use("/api", require("./routes/warRoomTeamRoutes"));
+app.use("/api", require("./routes/warRoomDocumentRoutes"));
+app.use("/api", require("./routes/warRoomVoirDireRoutes"));
+app.use("/api", require("./routes/warRoomInfoRoutes"));
 
-// 404 handler for API routes
-app.use('/api', (req, res) => {
-  res.status(404).json({
-    error: 'API endpoint not found',
-    path: req.originalUrl,
-    method: req.method
+// ===== Global error handler =====
+app.use(require("./middleware/errorHandler"));
+
+// ===== Start server with Next.js =====
+nextApp.prepare().then(() => {
+  // Let Next.js handle all non-API requests
+  app.all("*", (req, res) => handle(req, res));
+
+  const PORT = process.env.PORT || 4000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Unified app running on http://localhost:${PORT}`);
   });
 });
-
-// Global error handler
-app.use(errorHandler);
-
-// Start server
-async function startServer() {
-  try {
-    await poolPromise;
-    console.log('✅ Database connection established successfully');
-    const PORT = process.env.PORT || 4000;
-    const server = app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🔗 Health check: http://localhost:${PORT}/api/health`);
-    });
-    process.on('SIGTERM', () => {
-      console.log('SIGTERM received. Shutting down gracefully...');
-      server.close(() => {
-        console.log('Process terminated');
-        process.exit(0);
-      });
-    });
-    process.on('SIGINT', () => {
-      console.log('SIGINT received. Shutting down gracefully...');
-      server.close(() => {
-        console.log('Process terminated');
-        process.exit(0);
-      });
-    });
-  } catch (error) {
-    console.error('❌ Failed to start server:', error.message);
-    process.exit(1);
-  }
-}
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
-});
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  process.exit(1);
-});
-
-startServer();
