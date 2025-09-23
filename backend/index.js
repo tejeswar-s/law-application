@@ -84,9 +84,10 @@ app.use("/api", require("./routes/warRoomInfoRoutes"));
 app.use(require("./middleware/errorHandler"));
 
 // ===== Start server with Next.js =====
+// ===== Start server with Next.js =====
 nextApp.prepare().then(() => {
   // Let Next.js handle all non-API requests
-  app.all("*", (req, res) => handle(req, res));
+  app.all("/*", (req, res) => handle(req, res));
 
   const PORT = process.env.PORT || 4000;
   app.listen(PORT, () => {
