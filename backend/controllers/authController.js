@@ -33,7 +33,10 @@ const {
  * Attorney Signup
  */
 async function attorneySignup(req, res) {
-  console.log('✅ attorneySignup called, payload:', { ...req.body, password: req.body.password ? '[REDACTED]' : undefined });
+  console.log("✅ attorneySignup called, payload:", {
+    ...req.body,
+    password: req.body.password ? "[REDACTED]" : undefined,
+  });
   try {
     const {
       isAttorney,
@@ -57,12 +60,10 @@ async function attorneySignup(req, res) {
     } = req.body;
     // Require verification token
     if (!verificationToken) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Email verification is required. Please verify your email before continuing.",
-        });
+      return res.status(400).json({
+        message:
+          "Email verification is required. Please verify your email before continuing.",
+      });
     }
     // Validate verification token
     let decoded;
@@ -70,12 +71,10 @@ async function attorneySignup(req, res) {
       decoded = verifyEmailVerificationToken(verificationToken);
     } catch (e) {
       if (e.name === "TokenExpiredError")
-        return res
-          .status(410)
-          .json({
-            message:
-              "Verification link expired. Please request a new verification email.",
-          });
+        return res.status(410).json({
+          message:
+            "Verification link expired. Please request a new verification email.",
+        });
       if (e.name === "JsonWebTokenError")
         return res.status(400).json({ message: "Invalid verification token." });
       return res
@@ -87,11 +86,9 @@ async function attorneySignup(req, res) {
       decoded.email !== email.toLowerCase().trim() ||
       decoded.userType !== "attorney"
     ) {
-      return res
-        .status(400)
-        .json({
-          message: "Verification token does not match the provided email.",
-        });
+      return res.status(400).json({
+        message: "Verification token does not match the provided email.",
+      });
     }
 
     // Basic validation
@@ -198,7 +195,7 @@ async function attorneySignup(req, res) {
       officeAddress2: officeAddress2?.trim() || null,
       city: city.trim(),
       addressState: addressState.trim(),
-      county: county.trim(), // <-- ADD THIS LINE
+      county: county.trim(),
       zipCode: zipCode.trim(),
       email: email.toLowerCase().trim(),
       passwordHash,
@@ -222,7 +219,7 @@ async function attorneySignup(req, res) {
 }
 
 /**
- * Juror Signup
+ * Juror Signup - FIXED VERSION
  */
 async function jurorSignup(req, res) {
   try {
@@ -234,9 +231,12 @@ async function jurorSignup(req, res) {
       address1,
       address2,
       city,
+      cityCode,
       state,
+      stateCode,
       zipCode,
       county,
+      countyCode,
 
       // Optional demographics
       maritalStatus,
@@ -254,6 +254,15 @@ async function jurorSignup(req, res) {
       password,
       userAgreementAccepted,
     } = req.body;
+
+    console.log("Juror signup received data:", {
+      name: name || "NOT PROVIDED",
+      state: state || "NOT PROVIDED",
+      county: county || "NOT PROVIDED",
+      city: city || "NOT PROVIDED",
+      email: email || "NOT PROVIDED",
+      paymentMethod: paymentMethod || "NOT PROVIDED",
+    });
 
     // Basic validation
     const requiredFields = {
@@ -273,6 +282,7 @@ async function jurorSignup(req, res) {
     // Check for missing required fields
     for (const [field, message] of Object.entries(requiredFields)) {
       if (!req.body[field] && field !== "userAgreementAccepted") {
+        console.log(`Missing field: ${field}`);
         return res.status(400).json({ message });
       }
       if (field === "userAgreementAccepted" && !req.body[field]) {
@@ -316,12 +326,8 @@ async function jurorSignup(req, res) {
       return res.status(400).json({ message: "Please enter a valid ZIP code" });
     }
 
-    // Validate state format (2 letters)
-    if (!/^[A-Z]{2}$/.test(state.trim().toUpperCase())) {
-      return res
-        .status(400)
-        .json({ message: "State must be 2 letters (e.g., TX)" });
-    }
+    // REMOVED: State format validation - now accepts full state names from frontend
+    // Frontend sends full state names like "Texas", "California", etc.
 
     // Check eligibility based on criteria responses
     if (criteriaResponses) {
@@ -364,7 +370,7 @@ async function jurorSignup(req, res) {
     const saltRounds = 12;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // Prepare data for database
+    // Prepare data for database - UPDATED to handle frontend data structure
     const jurorData = {
       // Required fields
       name: name.trim(),
@@ -372,9 +378,14 @@ async function jurorSignup(req, res) {
       address1: address1.trim(),
       address2: address2?.trim() || null,
       city: city.trim(),
-      state: state.trim().toUpperCase(),
+      state: state.trim(), // Accept full state name from frontend
       zipCode: zipCode.trim(),
       county: county.trim(),
+
+      // Store codes if provided (for future use)
+      cityCode: cityCode || null,
+      stateCode: stateCode || null,
+      countyCode: countyCode || null,
 
       // Optional demographics
       maritalStatus: maritalStatus?.trim() || null,
@@ -393,6 +404,13 @@ async function jurorSignup(req, res) {
       criteriaResponses: criteriaResponses || null,
       userAgreementAccepted: Boolean(userAgreementAccepted),
     };
+
+    console.log("Creating juror with data:", {
+      name: jurorData.name,
+      state: jurorData.state,
+      county: jurorData.county,
+      city: jurorData.city,
+    });
 
     // Create juror record
     const jurorId = await createJuror(jurorData);

@@ -72,6 +72,7 @@ function SignupFlow() {
   const [personalSubStep, setPersonalSubStep] = useState<PersonalSubStep>(1);
   const [authSubStep, setAuthSubStep] = useState<AuthSubStep>(1);
   const searchParams = useSearchParams();
+  const draftRef = useRef<any>(null);
 
   // Form data
   const [criteriaAnswers, setCriteriaAnswers] = useState<CriteriaAnswers>({
@@ -213,8 +214,8 @@ function SignupFlow() {
     const hasLen = password.length >= 8;
     const hasNum = /\d/.test(password);
     const notSameAsName =
-      pd2.name.trim().length > 0 ? password.toLowerCase() !== pd2.name.trim().toLowerCase() : true;
-    const noTriple = !/(.)\\1\\1/.test(password);
+    pd2.name.trim().length > 0 ? password.toLowerCase() !== pd2.name.trim().toLowerCase() : true;
+    const noTriple = !/(.)\1\1/.test(password);
     const hasUpper = /[A-Z]/.test(password);
     const hasSpecial = /[!@#$%^&*()[\]{};:'",.<>/?\\|`~_\-+=]/.test(password);
     const confirmMatch = confirm === password && password.length > 0;
@@ -277,29 +278,105 @@ function SignupFlow() {
   }, [step, personalSubStep, authSubStep, criteriaAnswers, pd1, pd2, payMethod, email, agreed, stateCode, countyCode, cityCode]);
 
   // Handle email verification redirect via token
-  useEffect(() => {
-    const verifyToken = searchParams.get("verifyToken");
-    if (!verifyToken) return;
-    (async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/auth/verify-email-token?token=${encodeURIComponent(verifyToken)}`);
-        const data = await res.json();
-        if (res.ok && data?.ok) {
+  // Replace the existing email verification useEffect with this corrected version
+useEffect(() => {
+  const verifyToken = searchParams.get("verifyToken");
+  if (!verifyToken) return;
+  
+  (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/verify-email-token?token=${encodeURIComponent(verifyToken)}`);
+      const data = await res.json();
+      if (res.ok && data?.ok) {
+        // First restore from localStorage BEFORE setting step
+        let draft = {};
+        try {
+          const raw = localStorage.getItem("jurorSignupDraft");
+          if (raw) {
+            draft = JSON.parse(raw);
+            console.log("Restored draft:", draft); // Debug log
+          }
+        } catch (e) { 
+          console.error("Error parsing draft:", e);
+        }
+        
+        draftRef.current = draft;
+
+        // Restore ALL form states from draft immediately
+        if ((draft as any).criteriaAnswers) {
+          console.log("Restoring criteria answers:", (draft as any).criteriaAnswers);
+          setCriteriaAnswers((draft as any).criteriaAnswers);
+        }
+        if ((draft as any).pd1) {
+          console.log("Restoring pd1:", (draft as any).pd1);
+          setPd1((draft as any).pd1);
+        }
+        if ((draft as any).pd2) {
+          console.log("Restoring pd2:", (draft as any).pd2);
+          setPd2((draft as any).pd2);
+        }
+        if (typeof (draft as any).payMethod !== "undefined") {
+          console.log("Restoring payment method:", (draft as any).payMethod);
+          setPayMethod((draft as any).payMethod);
+        }
+        if ((draft as any).email) {
+          console.log("Restoring email:", (draft as any).email);
+          setEmail((draft as any).email);
+        }
+        if ((draft as any).agreed !== undefined) setAgreed((draft as any).agreed);
+        if ((draft as any).password) setPassword((draft as any).password);
+        if ((draft as any).confirm) setConfirm((draft as any).confirm);
+        if ((draft as any).stateCode) {
+          console.log("Restoring state code:", (draft as any).stateCode);
+          setStateCode((draft as any).stateCode);
+        }
+        if ((draft as any).countyCode) {
+          console.log("Restoring county code:", (draft as any).countyCode);
+          setCountyCode((draft as any).countyCode);
+        }
+        if ((draft as any).cityCode) {
+          console.log("Restoring city code:", (draft as any).cityCode);
+          setCityCode((draft as any).cityCode);
+        }
+
+        // Use setTimeout to ensure state updates are processed before changing step
+        setTimeout(() => {
           setStep(4);
           setAuthSubStep(1);
-          // persist immediately
+          
+          // Update localStorage with step change
           try {
-            const draft = JSON.parse(localStorage.getItem("jurorSignupDraft") || "{}");
-            draft.step = 4;
-            draft.authSubStep = 1;
-            localStorage.setItem("jurorSignupDraft", JSON.stringify(draft));
+            const updatedDraft = { ...draft, step: 4, authSubStep: 1 };
+            localStorage.setItem("jurorSignupDraft", JSON.stringify(updatedDraft));
           } catch {}
-        }
-      } catch (e) {
-        // ignore
+        }, 100);
       }
-    })();
-  }, [searchParams]);
+    } catch (e) {
+      console.error("Email verification error:", e);
+    }
+  })();
+}, [searchParams]);
+
+  // Restore county/city after dropdowns are loaded
+  useEffect(() => {
+    if (draftRef.current?.countyCode && availableCounties.length > 0) {
+      const draftCounty = availableCounties.find(c => c.value === draftRef.current.countyCode);
+      if (draftCounty) {
+        setPd2(prev => ({ ...prev, county: draftCounty.label }));
+        setCountyCode(draftRef.current.countyCode);
+      }
+    }
+  }, [availableCounties]);
+
+  useEffect(() => {
+    if (draftRef.current?.cityCode && availableCities.length > 0) {
+      const draftCity = availableCities.find(c => c.value === draftRef.current.cityCode);
+      if (draftCity) {
+        setPd2(prev => ({ ...prev, city: draftCity.label }));
+        setCityCode(draftRef.current.cityCode);
+      }
+    }
+  }, [availableCities]);
 
   // Validation functions
   const validateStep1 = (): boolean => {
@@ -374,7 +451,7 @@ function SignupFlow() {
     
     if (!email.trim()) {
       errors.email = "Email is required";
-    } else if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email.trim())) {
+    }  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       errors.email = "Please enter a valid email address";
     }
     
@@ -1219,7 +1296,7 @@ function SignupFlow() {
                   onClick={async () => {
                     setSubmitError("");
                     try {
-                      const res2 = await fetch("http://localhost:4000/api/auth/juror/send-email-verification", {
+                      const res2 = await fetch(`${API_BASE}/api/auth/juror/send-email-verification`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ email }),
