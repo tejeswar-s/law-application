@@ -528,16 +528,19 @@ function SignupFlow() {
         const formData = {
           // Criteria responses
           criteriaResponses: JSON.stringify(criteriaAnswers),
-          
+
           // Personal details
           name: pd2.name.trim(),
           phoneNumber: pd2.phone.trim(),
           address1: pd2.address1.trim(),
           address2: pd2.address2.trim() || null,
-          city: pd2.city.trim(),
-          state: pd2.state.trim(),
+          city: pd2.city.trim(),         // label
+          cityCode: cityCode,            // code
+          state: pd2.state.trim(),       // label
+          stateCode: stateCode,          // code
           zipCode: pd2.zip.trim(),
-          county: pd2.county.trim(),
+          county: pd2.county.trim(),     // label
+          countyCode: countyCode,        // code
           
           // Optional demographics
           maritalStatus: pd1.maritalStatus || null,
@@ -939,10 +942,12 @@ function SignupFlow() {
                     className={`w-full border rounded-md px-4 py-3 focus:ring-2 focus:ring-[#0A2342] outline-none text-[#0A2342] bg-white placeholder-gray-400 transition ${
                       validationErrors.state ? "border-red-300 focus:ring-red-200" : "border-gray-300"
                     }`}
-                    value={stateSearch}
+                    value={stateSearch !== "" ? stateSearch : pd2.state}
                     onChange={e => {
                       setStateSearch(e.target.value);
                       setStateDropdownOpen(true);
+                      setPd2(prev => ({ ...prev, state: "" })); // Clear state selection if user types
+                      setStateCode("");
                     }}
                     onFocus={() => setStateDropdownOpen(true)}
                     onBlur={() => setTimeout(() => setStateDropdownOpen(false), 100)}
@@ -964,7 +969,7 @@ function SignupFlow() {
                           onClick={() => {
                             setPd2(prev => ({ ...prev, state: state.label }));
                             setStateCode(state.value);
-                            setStateSearch(state.label);
+                            setStateSearch(""); // <-- Clear search so input shows selected value
                             setStateDropdownOpen(false);
                             clearFieldError('state');
                           }}
@@ -990,10 +995,12 @@ function SignupFlow() {
                     className={`w-full border rounded-md px-4 py-3 focus:ring-2 focus:ring-[#0A2342] outline-none text-[#0A2342] bg-white placeholder-gray-400 transition ${
                       validationErrors.county ? "border-red-300 focus:ring-red-200" : "border-gray-300"
                     } ${!stateCode ? "bg-gray-100 cursor-not-allowed" : ""}`}
-                    value={countySearch}
+                    value={countySearch !== "" ? countySearch : pd2.county}
                     onChange={e => {
                       setCountySearch(e.target.value);
                       setCountyDropdownOpen(true);
+                      setPd2(prev => ({ ...prev, county: "" })); // Clear county selection if user types
+                      setCountyCode("");
                     }}
                     onFocus={() => stateCode && setCountyDropdownOpen(true)}
                     onBlur={() => setTimeout(() => setCountyDropdownOpen(false), 100)}
@@ -1016,7 +1023,7 @@ function SignupFlow() {
                           onClick={() => {
                             setPd2(prev => ({ ...prev, county: county.label }));
                             setCountyCode(county.value);
-                            setCountySearch(county.label);
+                            setCountySearch(""); // <-- Clear search so input shows selected value
                             setCountyDropdownOpen(false);
                             clearFieldError('county');
                           }}
@@ -1042,10 +1049,12 @@ function SignupFlow() {
                     className={`w-full border rounded-md px-4 py-3 focus:ring-2 focus:ring-[#0A2342] outline-none text-[#0A2342] bg-white placeholder-gray-400 transition ${
                       validationErrors.city ? "border-red-300 focus:ring-red-200" : "border-gray-300"
                     } ${!stateCode ? "bg-gray-100 cursor-not-allowed" : ""}`}
-                    value={citySearch}
+                    value={citySearch !== "" ? citySearch : pd2.city}
                     onChange={e => {
                       setCitySearch(e.target.value);
                       setCityDropdownOpen(true);
+                      setPd2(prev => ({ ...prev, city: "" })); // Clear city selection if user types
+                      setCityCode("");
                     }}
                     onFocus={() => stateCode && setCityDropdownOpen(true)}
                     onBlur={() => setTimeout(() => setCityDropdownOpen(false), 100)}
@@ -1068,7 +1077,7 @@ function SignupFlow() {
                           onClick={() => {
                             setPd2(prev => ({ ...prev, city: city.label }));
                             setCityCode(city.value);
-                            setCitySearch(city.label);
+                            setCitySearch(""); // <-- Clear search so input shows selected value
                             setCityDropdownOpen(false);
                             clearFieldError('city');
                           }}

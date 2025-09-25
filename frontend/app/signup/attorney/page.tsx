@@ -8,7 +8,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -123,7 +123,6 @@ function AttorneySignupInner() {
       setForm(prev => ({ ...prev, county: "", countyCode: "", city: "", cityCode: "" }));
     }
     fetchCounties();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.stateCode]);
   
   // Fetch cities for selected county
@@ -384,6 +383,10 @@ function AttorneySignupInner() {
 
   // Previous step
   const prevStep = () => {
+    if (step === 1) {
+      router.push("/signup"); // <-- Change this path if your selection page is different
+      return;
+    }
     if (step > 1) {
       setStep(step - 1);
       setValidationErrors({});

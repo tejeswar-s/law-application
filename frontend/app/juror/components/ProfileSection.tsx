@@ -208,35 +208,36 @@ export default function ProfileSection() {
         <div className="flex flex-col md:flex-row gap-8 w-full max-w-7xl mx-auto">
           {/* My Info */}
           <div className="flex flex-col gap-8 md:w-[55%] w-full">
-            <div className="bg-white rounded shadow p-10 w-full" style={{ minHeight: 340, maxWidth: 480, marginLeft: 8 }}>
-              <h2 className="font-semibold text-lg mb-6">My Info</h2>
+            {/* My Info section */}
+            <div className="bg-white rounded shadow p-10 w-full" style={{ minHeight: 340, maxWidth: 480, marginLeft: 8, color: "black" }}>
+              <h2 className="font-semibold text-lg mb-6" style={{ color: "black" }}>My Info</h2>
               <div className="flex flex-col gap-5">
                 <div>
-                  <label className="block text-[15px] font-medium mb-2 text-[#222]">Full Name</label>
+                  <label className="block text-[15px] font-medium mb-2" style={{ color: "black" }}>Full Name</label>
                   <input
                     type="text"
                     value={juror?.name || ""}
                     disabled
-                    className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] focus:outline-none focus:ring-2 focus:ring-[#0C2D57] transition"
+                    className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] text-black focus:outline-none focus:ring-2 focus:ring-[#0C2D57] transition"
                   />
                 </div>
                 <div>
-                  <label className="block text-[15px] font-medium mb-2 text-[#222]">Email Address</label>
+                  <label className="block text-[15px] font-medium mb-2" style={{ color: "black" }}>Email Address</label>
                   <input
                     type="email"
                     value={juror?.email || ""}
                     disabled
-                    className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] focus:outline-none focus:ring-2 focus:ring-[#0C2D57] transition"
+                    className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] text-black focus:outline-none focus:ring-2 focus:ring-[#0C2D57] transition"
                   />
                 </div>
                 <div>
-                  <label className="block text-[15px] font-medium mb-2 text-[#222]">Password</label>
+                  <label className="block text-[15px] font-medium mb-2" style={{ color: "black" }}>Password</label>
                   <div className="relative">
                     <input
                       type={showPassword ? "text" : "password"}
                       value={"************"}
                       disabled
-                      className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] pr-10 focus:outline-none focus:ring-2 focus:ring-[#0C2D57] transition"
+                      className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] pr-10 text-black focus:outline-none focus:ring-2 focus:ring-[#0C2D57] transition"
                     />
                     <button
                       type="button"
@@ -248,12 +249,12 @@ export default function ProfileSection() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[15px] font-medium mb-2 text-[#222]">Phone Number</label>
+                  <label className="block text-[15px] font-medium mb-2" style={{ color: "black" }}>Phone Number</label>
                   <input
                     type="text"
                     value={juror?.phone || ""}
                     disabled
-                    className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] focus:outline-none focus:ring-2 focus:ring-[#0C2D57] transition"
+                    className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] text-black focus:outline-none focus:ring-2 focus:ring-[#0C2D57] transition"
                   />
                 </div>
                 <button
@@ -276,37 +277,39 @@ export default function ProfileSection() {
             </div>
 
             {/* Connected Accounts */}
-            <div className="bg-white rounded shadow p-7 w-full mt-6" style={{ maxWidth: 480, marginLeft: 8 }}>
-            <h2 className="font-semibold text-lg mb-5">Connected Accounts</h2>
-            <div className="flex flex-col gap-3">
+            {/* Connected Accounts section */}
+            <div className="bg-white rounded shadow p-7 w-full mt-6" style={{ maxWidth: 480, marginLeft: 8, color: "black" }}>
+              <h2 className="font-semibold text-lg mb-5" style={{ color: "black" }}>Connected Accounts</h2>
+              <div className="flex flex-col gap-3">
                 {/* Venmo */}
-                <div className="flex items-center border border-gray-300 rounded-md bg-[#F3F6FA] px-4 py-2" style={{ minHeight: 44 }}>
-                <SiVenmo className="text-[#3D95CE] text-2xl mr-3" />
-                <span className="font-semibold text-[15px]">Venmo</span>
-                <span className="ml-auto text-green-700 font-bold text-base">✓</span>
+                <div className="flex items-center border border-gray-300 rounded-md bg-[#F3F6FA] px-4 py-2" style={{ minHeight: 44, color: "black" }}>
+                  <SiVenmo className="text-[#3D95CE] text-2xl mr-3" />
+                  <span className="font-semibold text-[15px]">Venmo</span>
+                  <span className="ml-auto text-green-700 font-bold text-base">✓</span>
                 </div>
 
                 {/* PayPal */}
-                <div className="flex items-center border border-gray-300 rounded-md bg-white px-4 py-2 hover:bg-[#F3F6FA] cursor-pointer" style={{ minHeight: 44 }}>
-                <FaPaypal className="text-[#003087] text-2xl mr-3" />
-                <span className="font-semibold text-[15px]">Paypal</span>
+                <div className="flex items-center border border-gray-300 rounded-md bg-white px-4 py-2 hover:bg-[#F3F6FA] cursor-pointer" style={{ minHeight: 44, color: "black" }}>
+                  <FaPaypal className="text-[#003087] text-2xl mr-3" />
+                  <span className="font-semibold text-[15px]">Paypal</span>
                 </div>
 
                 {/* CashApp */}
-                <div className="flex items-center border border-gray-300 rounded-md bg-white px-4 py-2 hover:bg-[#F3F6FA] cursor-pointer" style={{ minHeight: 44 }}>
-                <SiCashapp className="text-[#00C244] text-2xl mr-3" />
-                <span className="font-semibold text-[15px]">Cashapp</span>
+                <div className="flex items-center border border-gray-300 rounded-md bg-white px-4 py-2 hover:bg-[#F3F6FA] cursor-pointer" style={{ minHeight: 44, color: "black" }}>
+                  <SiCashapp className="text-[#00C244] text-2xl mr-3" />
+                  <span className="font-semibold text-[15px]">Cashapp</span>
                 </div>
-            </div>
+              </div>
             </div>
           </div>
 
           {/* Manage Account */}
+          {/* Manage Account section */}
           <div className="flex flex-col gap-6 md:w-[45%] w-full">
-            <div className="bg-white rounded shadow p-8 w-full" style={{ minHeight: 120, maxWidth: 420 }}>
-              <h2 className="font-semibold text-lg mb-4">Manage Account</h2>
+            <div className="bg-white rounded shadow p-8 w-full" style={{ minHeight: 120, maxWidth: 420, color: "black" }}>
+              <h2 className="font-semibold text-lg mb-4" style={{ color: "black" }}>Manage Account</h2>
               <button
-                className="w-full border border-gray-400 rounded py-2 hover:bg-gray-100 transition-colors text-[15px] font-medium"
+                className="w-full border border-gray-400 rounded py-2 hover:bg-gray-100 transition-colors text-[15px] font-medium text-black"
                 onClick={() => setShowDelete(true)}
               >
                 Delete Account
@@ -347,7 +350,7 @@ export default function ProfileSection() {
                     type="text" 
                     value={editData.name} 
                     onChange={handleEditChange} 
-                    className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    className="w-full border rounded px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500" 
                   />
                 </div>
                 <div>
@@ -357,7 +360,7 @@ export default function ProfileSection() {
                     type="email" 
                     value={editData.email} 
                     disabled 
-                    className="w-full border rounded px-3 py-2 bg-gray-100" 
+                    className="w-full border rounded px-3 py-2 bg-gray-100 text-black" 
                   />
                 </div>
                 <div>
@@ -367,7 +370,7 @@ export default function ProfileSection() {
                     type="password" 
                     value={editData.password} 
                     disabled 
-                    className="w-full border rounded px-3 py-2 bg-gray-100" 
+                    className="w-full border rounded px-3 py-2 bg-gray-100 text-black" 
                     placeholder="Leave blank to keep current password"
                   />
                 </div>
@@ -378,7 +381,7 @@ export default function ProfileSection() {
                     type="text" 
                     value={editData.phone} 
                     onChange={handleEditChange} 
-                    className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                    className="w-full border rounded px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500" 
                   />
                 </div>
                 <div className="flex gap-2 mt-6">

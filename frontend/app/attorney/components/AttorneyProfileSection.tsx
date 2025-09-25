@@ -179,8 +179,8 @@ export default function AttorneyProfileSection() {
         <div className="flex flex-col md:flex-row gap-8 w-full max-w-7xl mx-auto">
           {/* My Info */}
           <div className="flex flex-col gap-8 md:w-[55%] w-full">
-            <div className="bg-white rounded shadow p-10 w-full" style={{ minHeight: 340, maxWidth: 480, marginLeft: 8 }}>
-              <h2 className="font-semibold text-lg mb-6">My Info</h2>
+            <div className="bg-white rounded shadow p-10 w-full" style={{ minHeight: 340, maxWidth: 480, marginLeft: 8, color: "black" }}>
+              <h2 className="font-semibold text-lg mb-6" style={{ color: "black" }}>My Info</h2>
               <div className="flex flex-col gap-5">
                 <div>
                   <label className="block text-[15px] font-medium mb-2 text-[#222]">First Name</label>
@@ -188,7 +188,7 @@ export default function AttorneyProfileSection() {
                     type="text"
                     value={attorney?.firstName || ""}
                     disabled
-                    className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] focus:outline-none focus:ring-2 focus:ring-[#16305B] transition"
+                    className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] text-black focus:outline-none focus:ring-2 focus:ring-[#16305B] transition"
                   />
                 </div>
                 <div>
@@ -197,7 +197,7 @@ export default function AttorneyProfileSection() {
                     type="text"
                     value={attorney?.lastName || ""}
                     disabled
-                    className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] focus:outline-none focus:ring-2 focus:ring-[#16305B] transition"
+                    className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] text-black focus:outline-none focus:ring-2 focus:ring-[#16305B] transition"
                   />
                 </div>
                 <div>
@@ -206,7 +206,7 @@ export default function AttorneyProfileSection() {
                     type="email"
                     value={attorney?.email || ""}
                     disabled
-                    className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] focus:outline-none focus:ring-2 focus:ring-[#16305B] transition"
+                    className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] text-black focus:outline-none focus:ring-2 focus:ring-[#16305B] transition"
                   />
                 </div>
                 <div>
@@ -216,7 +216,7 @@ export default function AttorneyProfileSection() {
                       type={showPassword ? "text" : "password"}
                       value={"************"}
                       disabled
-                      className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] pr-10 focus:outline-none focus:ring-2 focus:ring-[#16305B] transition"
+                      className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] pr-10 text-black focus:outline-none focus:ring-2 focus:ring-[#16305B] transition"
                     />
                     <button
                       type="button"
@@ -233,7 +233,7 @@ export default function AttorneyProfileSection() {
                     type="text"
                     value={attorney?.phoneNumber || ""}
                     disabled
-                    className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] focus:outline-none focus:ring-2 focus:ring-[#16305B] transition"
+                    className="w-full border border-gray-300 rounded-md px-4 py-2 bg-[#F7F7F7] text-[15px] text-black focus:outline-none focus:ring-2 focus:ring-[#16305B] transition"
                   />
                 </div>
                 <button
@@ -258,10 +258,10 @@ export default function AttorneyProfileSection() {
 
           {/* Manage Account */}
           <div className="flex flex-col gap-6 md:w-[45%] w-full">
-            <div className="bg-white rounded shadow p-8 w-full" style={{ minHeight: 120, maxWidth: 420 }}>
-              <h2 className="font-semibold text-lg mb-4">Manage Account</h2>
+            <div className="bg-white rounded shadow p-8 w-full" style={{ minHeight: 120, maxWidth: 420, color: "black" }}>
+              <h2 className="font-semibold text-lg mb-4" style={{ color: "black" }}>Manage Account</h2>
               <button
-                className="w-full border border-gray-400 rounded py-2 hover:bg-gray-100 transition-colors text-[15px] font-medium"
+                className="w-full border border-gray-400 rounded py-2 hover:bg-gray-100 transition-colors text-[15px] font-medium text-black"
                 onClick={() => setShowDelete(true)}
               >
                 Delete Account
@@ -300,7 +300,7 @@ export default function AttorneyProfileSection() {
                     type="text"
                     value={editData.firstName}
                     onChange={handleEditChange}
-                    className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border rounded px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
@@ -310,7 +310,7 @@ export default function AttorneyProfileSection() {
                     type="text"
                     value={editData.lastName}
                     onChange={handleEditChange}
-                    className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border rounded px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
@@ -320,7 +320,7 @@ export default function AttorneyProfileSection() {
                     type="email"
                     value={editData.email}
                     disabled
-                    className="w-full border rounded px-3 py-2 bg-gray-100"
+                    className="w-full border rounded px-3 py-2 bg-gray-100 text-black"
                   />
                 </div>
                 <div>
@@ -330,7 +330,7 @@ export default function AttorneyProfileSection() {
                     type="text"
                     value={editData.phoneNumber}
                     onChange={handleEditChange}
-                    className="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border rounded px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div className="flex gap-2 mt-6">
@@ -361,9 +361,9 @@ export default function AttorneyProfileSection() {
               className="absolute inset-0 bg-black/10"
               onClick={() => !deleting && setShowDelete(false)}
             ></div>
-            <div className="relative bg-white rounded-xl shadow-xl p-7 w-full max-w-lg" style={{ minWidth: 380, maxWidth: 440 }}>
+            <div className="relative bg-white rounded-xl shadow-xl p-7 w-full max-w-lg" style={{ minWidth: 380, maxWidth: 440, color: "black" }}>
               <div className="flex items-center justify-between mb-2">
-                <h2 className="text-xl font-semibold text-[#222]">Delete Account</h2>
+                <h2 className="text-xl font-semibold" style={{ color: "black" }}>Delete Account</h2>
                 <button
                   className="text-gray-500 text-xl hover:text-gray-700"
                   onClick={() => !deleting && setShowDelete(false)}
@@ -373,7 +373,7 @@ export default function AttorneyProfileSection() {
                   <X size={22} />
                 </button>
               </div>
-              <div className="mb-6 mt-1 text-[15px] text-gray-800">Are you sure you want to delete your account?</div>
+              <div className="mb-6 mt-1 text-[15px]" style={{ color: "black" }}>Are you sure you want to delete your account?</div>
               <div className="flex gap-2 justify-end">
                 <button
                   className="px-6 py-2 bg-[#B3261E] text-white rounded shadow-sm font-medium text-[16px] hover:bg-[#a11d17] focus:outline-none focus:ring-2 focus:ring-red-400 border border-[#B3261E] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"

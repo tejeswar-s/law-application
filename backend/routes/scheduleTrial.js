@@ -13,6 +13,17 @@ const config = {
     trustServerCertificate: false,
   },
 };
+router.get("/cases", async (req, res) => {
+  try {
+    await sql.connect(config);
+    const result = await sql.query("SELECT * FROM ScheduledTrials");
+    res.json(result.recordset);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch cases" });
+  }
+});
+
 
 router.post("/schedule-trial", async (req, res) => {
   try {

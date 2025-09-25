@@ -293,27 +293,39 @@ export default function AttorneyHomeSection() {
                 <div className="text-gray-500">No upcoming events.</div>
               ) : (
                 <div>
-                  {sortedDates.map(date => (
-                    <div key={date} className="mb-4 flex">
-                      <div className="w-48 font-semibold text-[#363636]">
-                        {isToday(parseISO(date))
-                          ? `Today, ${format(parseISO(date), "MMMM d")}`
-                          : format(parseISO(date), "EEE, MMMM d")}
+                  {sortedDates.map(date => {
+                    let dateLabel = "Invalid date";
+                    let parsed: Date | null = null;
+                    try {
+                      parsed = parseISO(date);
+                      if (!isNaN(parsed.getTime())) {
+                        dateLabel = isToday(parsed)
+                          ? `Today, ${format(parsed, "MMMM d")}`
+                          : format(parsed, "EEE, MMMM d");
+                      }
+                    } catch {
+                      // leave as "Invalid date"
+                    }
+                    return (
+                      <div key={date} className="mb-4 flex">
+                        <div className="w-48 font-semibold text-[#363636]">
+                          {dateLabel}
+                        </div>
+                        <div className="flex-1">
+                          {grouped[date].map(ev => (
+                            <div key={ev.Id} className="mb-1">
+                              <span className="font-medium text-black">
+                                {ev.ScheduledTime && (
+                                  <span>{ev.ScheduledTime} </span>
+                                )}
+                                {getCaseName(ev.PlaintiffGroups, ev.DefendantGroups)} War Room due
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        {grouped[date].map(ev => (
-                          <div key={ev.Id} className="mb-1">
-                            <span className="font-medium text-black">
-                              {ev.ScheduledTime && (
-                                <span>{ev.ScheduledTime} </span>
-                              )}
-                              {getCaseName(ev.PlaintiffGroups, ev.DefendantGroups)} War Room due
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
