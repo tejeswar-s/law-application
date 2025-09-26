@@ -23,6 +23,7 @@ type Case = {
   DefendantGroups: string; // JSON string
   ScheduledDate: string;   // e.g., "2025-08-23"
   ScheduledTime: string;   // e.g., "12:00"
+  attorneyEmail: string;   // added field for attorney's email
   // ...other fields
 };
 
@@ -338,3 +339,18 @@ export default function AttorneyHomeSection() {
     </main>
   );
 }
+
+// Example frontend API call
+const fetchCases = async (userId) => {
+  try {
+    const response = await fetch(`/api/cases?userId=${encodeURIComponent(userId)}`);
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to fetch cases');
+    }
+    return data;
+  } catch (error) {
+    console.error('Error fetching cases:', error);
+    throw error;
+  }
+};

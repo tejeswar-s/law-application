@@ -255,6 +255,7 @@ async function getAllAttorneys(page = 1, limit = 10) {
           LastName,
           LawFirmName,
           Email,
+          StateBarNumber,
           State,
           VerificationStatus,
           IsVerified,

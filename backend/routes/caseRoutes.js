@@ -16,20 +16,34 @@ const config = {
 };
 router.get("/cases", async (req, res) => {
   const userId = req.query.userId;
-  await sql.connect(config);
+  
+  try {
+    await sql.connect(config);
+    console.log("Received userId:", userId);
 
-  if (userId) {
-    // Attorney dashboard: show only their cases
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    console.log("Filtering for attorneyEmail:", userId);
     const result = await sql.query`
-      SELECT * FROM ScheduledTrials WHERE UserId = ${userId} ORDER BY Id DESC
+      SELECT * FROM ScheduledTrials 
+      WHERE Email = ${userId.trim()} 
+      ORDER BY Id DESC
     `;
+    
+    console.log("Query result:", result.recordset);
+    
+    if (result.recordset.length === 0) {
+      return res.json([]);
+    }
+
     return res.json(result.recordset);
-  } else {
-    // Juror dashboard: show all cases
-    const result = await sql.query`
-      SELECT * FROM ScheduledTrials ORDER BY Id DESC
-    `;
-    return res.json(result.recordset);
+  } catch (error) {
+    console.error("Database error:", error);
+    return res.status(500).json({ error: "Database error occurred" });
+  } finally {
+    sql.close();
   }
 });
 

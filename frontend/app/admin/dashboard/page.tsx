@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Users, UserCheck, Calendar, FileText, AlertCircle, CheckCircle2, Clock, Building2 } from "lucide-react";
 
 const BLUE = "#0A2342";
@@ -8,20 +8,29 @@ const LIGHT_BLUE = "#e6ecf5";
 const ACCENT_YELLOW = "#F6E27F";
 
 type Attorney = {
-  id: string;
-  name: string;
-  email: string;
-  barNumber: string;
-  verified: boolean;
+  AttorneyId: number;
+  FirstName: string;
+  LastName: string;
+  Email: string;
+  LawFirmName: string;
+  State: string;
+  StateBarNumber: string;
+  IsVerified: boolean;
+  CreatedAt: string;
+  VerificationStatus?: string;
 };
 
 type Juror = {
-  id: string;
-  name: string;
-  email: string;
-  age: string;
-  county: string;
-  verified: boolean;
+  JurorId: number;
+  Name: string;
+  Email: string;
+  County: string;
+  State: string;
+  IsVerified: boolean;
+  IsActive?: boolean;
+  OnboardingCompleted?: boolean;
+  CreatedAt: string;
+  CriteriaResponses?: { question: string; answer: string }[];
 };
 
 export default function AdminDashboard() {
@@ -29,6 +38,8 @@ export default function AdminDashboard() {
   const [jurors, setJurors] = useState<Juror[]>([]);
   const [loading, setLoading] = useState(true);
   const [cases, setCases] = useState<any[]>([]);
+  const [showCriteriaPopup, setShowCriteriaPopup] = useState(false);
+  const [currentCriteriaResponses, setCurrentCriteriaResponses] = useState<{ question: string; answer: string }[]>([]);
 
   useEffect(() => {
     const fetchCases = async () => {
@@ -74,7 +85,19 @@ export default function AdminDashboard() {
         console.log(attData);
         console.log(jurData);
         setAttorneys(attData.attorneys || attData);
-        setJurors(jurData.jurors || jurData);
+        const jurorsData = (jurData.jurors || jurData).map((j: any) => ({
+          JurorId: j.JurorId ?? j.id,
+          Name: j.Name ?? j.name,
+          Email: j.Email ?? j.email,
+          County: j.County ?? j.county,
+          State: j.State ?? j.state,
+          IsVerified: j.IsVerified ?? j.verified,
+          IsActive: j.IsActive ?? j.isActive,
+          OnboardingCompleted: j.OnboardingCompleted ?? j.onboardingCompleted,
+          CreatedAt: j.CreatedAt ?? j.createdAt,
+          CriteriaResponses: j.CriteriaResponses ?? j.criteriaResponses ?? [],
+        }));
+        setJurors(jurorsData);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -128,6 +151,41 @@ export default function AdminDashboard() {
     totalJurors: jurors.length,
     verifiedJurors: jurors.filter(j => j.IsVerified).length,
   };
+
+  // Filter states
+  const [attorneyFilter, setAttorneyFilter] = useState<"all" | "verified" | "not_verified">("all");
+  const [jurorFilter, setJurorFilter] = useState<"all" | "verified" | "not_verified">("all");
+
+  // Pagination states
+  const [attorneyPage, setAttorneyPage] = useState(1);
+  const [jurorPage, setJurorPage] = useState(1);
+  const PAGE_SIZE = 10;
+
+  // Refs for smooth scroll
+  const attorneySectionRef = useRef<HTMLDivElement>(null);
+  const jurorSectionRef = useRef<HTMLDivElement>(null);
+
+  // Filtered attorneys
+  const filteredAttorneys = attorneys.filter(a => {
+    if (attorneyFilter === "verified") return a.IsVerified;
+    if (attorneyFilter === "not_verified") return !a.IsVerified;
+    return true;
+  });
+  // Paginated attorneys
+  const attorneyStartIdx = (attorneyPage - 1) * PAGE_SIZE;
+  const attorneyEndIdx = attorneyStartIdx + PAGE_SIZE;
+  const paginatedAttorneys = filteredAttorneys.slice(attorneyStartIdx, attorneyEndIdx);
+
+  // Filtered jurors
+  const filteredJurors = jurors.filter(j => {
+    if (jurorFilter === "verified") return j.IsVerified;
+    if (jurorFilter === "not_verified") return !j.IsVerified;
+    return true;
+  });
+  // Paginated jurors
+  const jurorStartIdx = (jurorPage - 1) * PAGE_SIZE;
+  const jurorEndIdx = jurorStartIdx + PAGE_SIZE;
+  const paginatedJurors = filteredJurors.slice(jurorStartIdx, jurorEndIdx);
 
   if (loading) {
     return (
@@ -216,26 +274,30 @@ export default function AdminDashboard() {
           {/* Quick Actions */}
           <div className="lg:col-span-1 space-y-4">
             <h2 className="text-xl font-semibold mb-4" style={{ color: BLUE }}>Quick Actions</h2>
-            
             <div className="space-y-3">
-              <button className="w-full bg-white rounded-lg p-4 text-left font-medium hover:shadow-md transition-all border border-gray-200 group">
-                <div className="flex items-center">
-                  <FileText className="h-5 w-5 text-gray-600 group-hover:text-blue-600 transition-colors" />
-                  <span className="ml-3 text-gray-900 group-hover:text-blue-600">Pending Cases Excel Sheet</span>
-                </div>
-              </button>
-              
-              <button className="w-full bg-white rounded-lg p-4 text-left font-medium hover:shadow-md transition-all border border-gray-200 group">
+              <button
+                className="w-full bg-white rounded-lg p-4 text-left font-medium hover:shadow-md transition-all border border-gray-200 group"
+                onClick={() => attorneySectionRef.current?.scrollIntoView({ behavior: "smooth" })}
+              >
                 <div className="flex items-center">
                   <Building2 className="h-5 w-5 text-gray-600 group-hover:text-blue-600 transition-colors" />
                   <span className="ml-3 text-gray-900 group-hover:text-blue-600">Attorneys Excel Sheet</span>
                 </div>
               </button>
-              
-              <button className="w-full bg-white rounded-lg p-4 text-left font-medium hover:shadow-md transition-all border border-gray-200 group">
+              <button
+                className="w-full bg-white rounded-lg p-4 text-left font-medium hover:shadow-md transition-all border border-gray-200 group"
+                onClick={() => jurorSectionRef.current?.scrollIntoView({ behavior: "smooth" })}
+              >
                 <div className="flex items-center">
                   <Users className="h-5 w-5 text-gray-600 group-hover:text-blue-600 transition-colors" />
                   <span className="ml-3 text-gray-900 group-hover:text-blue-600">Jurors Excel Sheet</span>
+                </div>
+              </button>
+              
+              <button className="w-full bg-white rounded-lg p-4 text-left font-medium hover:shadow-md transition-all border border-gray-200 group">
+                <div className="flex items-center">
+                  <FileText className="h-5 w-5 text-gray-600 group-hover:text-blue-600 transition-colors" />
+                  <span className="ml-3 text-gray-900 group-hover:text-blue-600">Pending Cases Excel Sheet</span>
                 </div>
               </button>
             </div>
@@ -285,67 +347,58 @@ export default function AdminDashboard() {
         {/* Today's Activities */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Today's Trials */}
-<div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+<div
+  className="bg-white rounded-xl shadow-sm p-6 border border-gray-200"
+  style={{ minHeight: 320, maxHeight: 320, display: 'flex', flexDirection: 'column' }}
+>
   <div className="flex items-center mb-4">
     <Clock className="h-6 w-6 mr-3" style={{ color: BLUE }} />
     <h3 className="text-xl font-semibold" style={{ color: BLUE }}>
       Today's Trials
     </h3>
   </div>
-
   {cases.length === 0 ? (
     <div className="text-center text-gray-500 py-8">
       No trials scheduled today.
     </div>
   ) : (
-    <div className="space-y-6">
+    <div
+      className="flex-1 overflow-y-auto space-y-6"
+      style={{ maxHeight: 220 }} // Adjust height for ~3 items
+    >
       {cases.map((c) => (
-        <div
-          key={c.id}
-          className="border-l-4 pl-4"
-          style={{ borderColor: BLUE }}
-        >
-          <div className="font-semibold text-gray-900 mb-2">
-            {c.caseNumber} – Scheduled Start Time:{" "}
-            {c.scheduledTime || "_____"}
+        <div key={c.id} className="border rounded-lg p-4 bg-gray-50">
+          <div className="font-semibold text-blue-900">{c.caseNumber}</div>
+          <div className="text-sm text-gray-600">Courtroom: {c.courtroom}</div>
+          <div className="text-sm text-gray-600">
+            Date: {c.scheduledDate} | Time: {c.scheduledTime}
           </div>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center text-blue-600 hover:underline cursor-pointer">
-              <span>🔗 Link to {c.courtroom}</span>
-            </div>
-            <div className="text-gray-600">
-              Debriefing Starts: {c.debriefing}
-            </div>
-            <div className="text-gray-600">
-              Actual Ending Time: {c.endingTime}
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-gray-600">Notes:</span>
-              <input className="flex-1 border border-gray-300 rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" />
-            </div>
+          <div className="text-sm text-gray-600">
+            Debriefing: {c.debriefing} | Ending: {c.endingTime}
           </div>
         </div>
       ))}
+      {cases.length > 3 && (
+        <div className="text-center text-blue-600 text-sm mt-2">Scroll for more...</div>
+      )}
     </div>
   )}
 </div>
 
 
           {/* Today's Notifications */}
-          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200" style={{ minHeight: 320, maxHeight: 320, display: 'flex', flexDirection: 'column' }}>
             <div className="flex items-center mb-4">
               <AlertCircle className="h-6 w-6 mr-3" style={{ color: BLUE }} />
               <h3 className="text-xl font-semibold" style={{ color: BLUE }}>Today's Notifications</h3>
             </div>
             
-            <div className="space-y-4">
+            <div className="flex-1 flex flex-col justify-center space-y-4">
               <div className="flex items-center space-x-3">
-                <span className="text-gray-700 font-medium">Case No.</span>
-                <input className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" />
+                <input className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-black" />
               </div>
               <div className="flex items-center space-x-3">
-                <span className="text-gray-700 font-medium">Case No.</span>
-                <input className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" />
+                <input className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-black" />
               </div>
               <button className="w-full mt-4 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium">
                 Send Notifications
@@ -357,19 +410,30 @@ export default function AdminDashboard() {
         {/* Data Tables */}
         <div className="space-y-8">
           {/* Attorneys Table */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div ref={attorneySectionRef} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <Building2 className="h-6 w-6 mr-3" style={{ color: BLUE }} />
                   <h2 className="text-xl font-semibold" style={{ color: BLUE }}>Attorneys Management</h2>
                 </div>
-                <div className="text-sm text-gray-600">
-                  {attorneys.length} total attorneys
+                <div className="flex items-center space-x-4">
+                  <div className="text-sm text-gray-600">{filteredAttorneys.length} attorneys</div>
+                  <select
+                    className="border rounded px-2 py-1 text-sm text-black bg-white"
+                    value={attorneyFilter}
+                    onChange={e => {
+                      setAttorneyFilter(e.target.value as any);
+                      setAttorneyPage(1);
+                    }}
+                  >
+                    <option value="all">All</option>
+                    <option value="verified">Verified</option>
+                    <option value="not_verified">Not Verified</option>
+                  </select>
                 </div>
               </div>
             </div>
-            
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
@@ -384,7 +448,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {attorneys.length === 0 ? (
+                  {paginatedAttorneys.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-6 py-12 text-center">
                         <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -393,7 +457,7 @@ export default function AdminDashboard() {
                       </td>
                     </tr>
                   ) : (
-                    attorneys.map((attorney) => (
+                    paginatedAttorneys.map((attorney) => (
                       <tr key={attorney.AttorneyId} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4">
                           <div>
@@ -442,22 +506,53 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+            {/* Pagination Controls */}
+            <div className="flex justify-between items-center px-6 py-4 bg-gray-50">
+              <button
+                className="px-3 py-1 rounded bg-gray-200 text-black disabled:opacity-50"
+                disabled={attorneyPage === 1}
+                onClick={() => setAttorneyPage(attorneyPage - 1)}
+              >
+                Previous
+              </button>
+              <span className="text-sm text-black">
+                Page {attorneyPage} of {Math.max(1, Math.ceil(filteredAttorneys.length / PAGE_SIZE))}
+              </span>
+              <button
+                className="px-3 py-1 rounded bg-gray-200 text-black disabled:opacity-50"
+                disabled={attorneyEndIdx >= filteredAttorneys.length}
+                onClick={() => setAttorneyPage(attorneyPage + 1)}
+              >
+                Next
+              </button>
+            </div>
           </div>
 
           {/* Jurors Table */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div ref={jurorSectionRef} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <Users className="h-6 w-6 mr-3" style={{ color: BLUE }} />
                   <h2 className="text-xl font-semibold" style={{ color: BLUE }}>Jurors Management</h2>
                 </div>
-                <div className="text-sm text-gray-600">
-                  {jurors.length} total jurors
+                <div className="flex items-center space-x-4">
+                  <div className="text-sm text-gray-600">{filteredJurors.length} jurors</div>
+                  <select
+                    className="border rounded px-2 py-1 text-sm text-black bg-white"
+                    value={jurorFilter}
+                    onChange={e => {
+                      setJurorFilter(e.target.value as any);
+                      setJurorPage(1);
+                    }}
+                  >
+                    <option value="all">All</option>
+                    <option value="verified">Verified</option>
+                    <option value="not_verified">Not Verified</option>
+                  </select>
                 </div>
               </div>
             </div>
-            
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
@@ -472,7 +567,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {jurors.length === 0 ? (
+                  {paginatedJurors.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-6 py-12 text-center">
                         <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -481,7 +576,7 @@ export default function AdminDashboard() {
                       </td>
                     </tr>
                   ) : (
-                    jurors.map((juror) => (
+                    paginatedJurors.map((juror) => (
                       <tr key={juror.JurorId} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4">
                           <div>
@@ -529,6 +624,17 @@ export default function AdminDashboard() {
                               Pending
                             </span>
                           )}
+                          {juror.CriteriaResponses && juror.CriteriaResponses.length > 0 && (
+                            <button
+                              className="ml-2 px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-blue-800 hover:bg-blue-100 transition"
+                              onClick={() => {
+                                setCurrentCriteriaResponses(juror.CriteriaResponses!);
+                                setShowCriteriaPopup(true);
+                              }}
+                            >
+                              View
+                            </button>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {new Date(juror.CreatedAt).toLocaleDateString()}
@@ -551,8 +657,52 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+            {/* Pagination Controls */}
+            <div className="flex justify-between items-center px-6 py-4 bg-gray-50">
+              <button
+                className="px-3 py-1 rounded bg-gray-200 text-black disabled:opacity-50"
+                disabled={jurorPage === 1}
+                onClick={() => setJurorPage(jurorPage - 1)}
+              >
+                Previous
+              </button>
+              <span className="text-sm text-black">
+                Page {jurorPage} of {Math.max(1, Math.ceil(filteredJurors.length / PAGE_SIZE))}
+              </span>
+              <button
+                className="px-3 py-1 rounded bg-gray-200 text-black disabled:opacity-50"
+                disabled={jurorEndIdx >= filteredJurors.length}
+                onClick={() => setJurorPage(jurorPage + 1)}
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
+
+        {showCriteriaPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+            <div className="bg-white rounded-lg shadow-lg p-6 min-w-[300px] max-w-[90vw]">
+              <h3 className="text-lg font-semibold mb-3 text-blue-900">Criteria Responses</h3>
+              <div className="space-y-2 mb-4">
+                {currentCriteriaResponses.map((resp, idx) => (
+                  <div key={idx} className="text-sm text-gray-800">
+                    <span className="font-semibold">{resp.question}:</span> {resp.answer}
+                  </div>
+                ))}
+                {currentCriteriaResponses.length === 0 && (
+                  <div className="text-sm text-gray-400">No responses available.</div>
+                )}
+              </div>
+              <button
+                className="px-4 py-1 rounded bg-blue-600 text-white font-medium hover:bg-blue-700"
+                onClick={() => setShowCriteriaPopup(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );
