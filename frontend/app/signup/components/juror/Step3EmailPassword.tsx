@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FormField, TextInput } from '../../../../components/forms/FormField';
 import { JurorFormData, ValidationErrors } from '../../../../types/signup.types';
-import { validatePasswordRequirements } from '../../../../lib/validation/validator';
+import { validatePasswordRequirements } from '../../../../lib/validation/validators';
 import { Eye, EyeOff, Check } from 'lucide-react';
 
 interface Step3EmailPasswordProps {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FormField, TextInput } from '../../../../components/forms/FormField';
 import { AttorneyFormData, ValidationErrors } from '../../../../types/signup.types';
-import { validatePasswordRequirements } from '@/lib/validation/validator';
+import { validatePasswordRequirements } from '../../../../lib/validation/validators';
 import { Eye, EyeOff } from 'lucide-react';
 
 interface Step3EmailPasswordProps {
@@ -9,8 +9,10 @@ interface Step3EmailPasswordProps {
   onUpdate: (data: Partial<AttorneyFormData>) => void;
   validationErrors: ValidationErrors;
   onClearError: (field: string) => void;
+  authSubStep: 1 | 2; // ADD: Sub-step support
   onNext: () => void;
   loading?: boolean;
+  onResendEmail?: () => void; // ADD: Resend email handler
 }
 
 export function Step3EmailPassword({
@@ -18,8 +20,10 @@ export function Step3EmailPassword({
   onUpdate,
   validationErrors,
   onClearError,
+  authSubStep, // ADD: Use authSubStep
   onNext,
   loading = false,
+  onResendEmail, // ADD: Resend email handler
 }: Step3EmailPasswordProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -39,6 +43,50 @@ export function Step3EmailPassword({
     { key: "passwordsMatch", text: "Re-typed password matches", valid: formData.password && formData.confirmPassword && formData.password === formData.confirmPassword },
   ];
 
+  // ADD: Email verification waiting screen (authSubStep 2)
+  if (authSubStep === 2) {
+    return (
+      <div className="flex-1 flex flex-col pl-28">
+        <div className="w-full max-w-2xl">
+          <h1 className="text-3xl font-bold text-[#16305B] mb-8 mt-2">
+            Verify Your Email
+          </h1>
+          <div className="text-[#16305B] text-base mb-6">
+            {loading ? (
+              <div>
+                <p>Sending verification email to <b>{formData.email}</b>...</p>
+              </div>
+            ) : (
+              <>
+                <p>
+                  We have sent a verification link to <b>{formData.email}</b>.<br />
+                  Please check your inbox and click the link to verify your email address.
+                </p>
+                <p className="mt-4">
+                  Once verified, this page will automatically update and allow you to continue.
+                </p>
+                {onResendEmail && (
+                  <p className="mt-4 text-sm text-gray-600">
+                    Didn't receive the email? Check your spam folder or{' '}
+                    <button
+                      type="button"
+                      className="underline text-[#16305B] hover:text-[#0A2342]"
+                      onClick={onResendEmail}
+                    >
+                      resend the link
+                    </button>
+                    .
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Original email/password form (authSubStep 1)
   return (
     <div className="flex-1 flex flex-col pl-28">
       <div className="w-full max-w-2xl">
@@ -100,10 +148,10 @@ export function Step3EmailPassword({
                 <div key={check.key} className="flex items-center gap-2">
                   <input 
                     type="checkbox" 
-                    checked={Boolean(check.valid)} 
-                    onChange={() => {}} 
+                    checked={Boolean(check.valid)}
+                    readOnly
                     className="w-4 h-4 accent-[#16305B]" 
-                    />
+                  />
                   <span className={check.valid ? "text-green-600" : "text-[#16305B]"}>
                     {check.text}
                   </span>
@@ -144,10 +192,10 @@ export function Step3EmailPassword({
             <div className="mt-2">
               <div className="flex items-center gap-2 text-sm">
                 <input 
-                    type="checkbox" 
-                    checked={Boolean(passwordChecks[passwordChecks.length - 1].valid)} 
-                    onChange={() => {}} 
-                    className="w-4 h-4 accent-[#16305B]" 
+                  type="checkbox" 
+                  checked={Boolean(passwordChecks[passwordChecks.length - 1].valid)} 
+                  readOnly
+                  className="w-4 h-4 accent-[#16305B]" 
                 />
                 <span className={passwordChecks[passwordChecks.length - 1].valid ? "text-green-600" : "text-[#16305B]"}>
                   {passwordChecks[passwordChecks.length - 1].text}
@@ -167,7 +215,7 @@ export function Step3EmailPassword({
                   : "bg-[#16305B] text-white hover:bg-[#0A2342]"
               }`}
             >
-              {loading ? "Processing..." : "Next"}
+              {loading ? "Sending Verification Email..." : "Next"}
             </button>
           </div>
         </form>

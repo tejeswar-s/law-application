@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { JurorFormData, ValidationErrors } from '../../../../types/signup.types';
 
 interface Step4AgreementProps {
@@ -26,13 +26,17 @@ export function Step4Agreement({
 }: Step4AgreementProps) {
   const agreementRef = useRef<HTMLDivElement>(null);
 
-  const handleAgreementScroll = () => {
+  // Stable scroll handler that only updates when state actually changes
+  const handleAgreementScroll = useCallback(() => {
     const element = agreementRef.current;
     if (element) {
       const isAtBottom = element.scrollHeight - element.scrollTop <= element.clientHeight + 5;
-      onScrolledToBottom(isAtBottom);
+      // Only call the callback if the value actually changed
+      if (isAtBottom !== hasScrolledToBottom) {
+        onScrolledToBottom(isAtBottom);
+      }
     }
-  };
+  }, [hasScrolledToBottom, onScrolledToBottom]);
 
   const getTodayDate = () => {
     return new Date().toLocaleDateString('en-US', { 

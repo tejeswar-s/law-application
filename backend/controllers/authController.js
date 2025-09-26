@@ -219,7 +219,7 @@ async function attorneySignup(req, res) {
 }
 
 /**
- * Juror Signup - FIXED VERSION
+ * Juror Signup - IMPROVED VERSION
  */
 async function jurorSignup(req, res) {
   try {
@@ -262,32 +262,46 @@ async function jurorSignup(req, res) {
       city: city || "NOT PROVIDED",
       email: email || "NOT PROVIDED",
       paymentMethod: paymentMethod || "NOT PROVIDED",
+      hasName: !!name,
+      nameLength: name?.length || 0,
+      nameValue: typeof name === "string" ? `"${name}"` : typeof name,
     });
 
-    // Basic validation
-    const requiredFields = {
-      name: "Name is required",
-      phoneNumber: "Phone number is required",
-      address1: "Address is required",
-      city: "City is required",
-      state: "State is required",
-      zipCode: "ZIP code is required",
-      county: "County is required",
-      paymentMethod: "Payment method is required",
-      email: "Email is required",
-      password: "Password is required",
-      userAgreementAccepted: "User agreement must be accepted",
-    };
+    // Enhanced validation with better error messages
+    const requiredFields = [
+      { field: "name", value: name, message: "Name is required" },
+      {
+        field: "phoneNumber",
+        value: phoneNumber,
+        message: "Phone number is required",
+      },
+      { field: "address1", value: address1, message: "Address is required" },
+      { field: "city", value: city, message: "City is required" },
+      { field: "state", value: state, message: "State is required" },
+      { field: "zipCode", value: zipCode, message: "ZIP code is required" },
+      { field: "county", value: county, message: "County is required" },
+      {
+        field: "paymentMethod",
+        value: paymentMethod,
+        message: "Payment method is required",
+      },
+      { field: "email", value: email, message: "Email is required" },
+      { field: "password", value: password, message: "Password is required" },
+    ];
 
-    // Check for missing required fields
-    for (const [field, message] of Object.entries(requiredFields)) {
-      if (!req.body[field] && field !== "userAgreementAccepted") {
-        console.log(`Missing field: ${field}`);
+    // Check for missing or empty required fields
+    for (const { field, value, message } of requiredFields) {
+      if (!value || (typeof value === "string" && value.trim() === "")) {
+        console.log(`Validation failed for field: ${field}, value:`, value);
         return res.status(400).json({ message });
       }
-      if (field === "userAgreementAccepted" && !req.body[field]) {
-        return res.status(400).json({ message });
-      }
+    }
+
+    // Special validation for userAgreementAccepted
+    if (!userAgreementAccepted) {
+      return res
+        .status(400)
+        .json({ message: "User agreement must be accepted" });
     }
 
     // Validate payment method
@@ -311,10 +325,14 @@ async function jurorSignup(req, res) {
     }
 
     // Validate password
+    const nameParts = name.trim().split(" ");
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts[nameParts.length - 1] || "";
+
     const passwordValidation = validatePassword(
       password,
-      name.split(" ")[0],
-      name.split(" ").pop(),
+      firstName,
+      lastName,
       email
     );
     if (!passwordValidation.isValid) {
@@ -325,9 +343,6 @@ async function jurorSignup(req, res) {
     if (!/^\d{5}(-\d{4})?$/.test(zipCode.trim())) {
       return res.status(400).json({ message: "Please enter a valid ZIP code" });
     }
-
-    // REMOVED: State format validation - now accepts full state names from frontend
-    // Frontend sends full state names like "Texas", "California", etc.
 
     // Check eligibility based on criteria responses
     if (criteriaResponses) {
@@ -341,9 +356,9 @@ async function jurorSignup(req, res) {
           });
         }
         if (criteria.citizen === "no") {
-          return res
-            .status(400)
-            .json({ message: "You must be a US citizen to serve as a juror" });
+          return res.status(400).json({
+            message: "You must be a US citizen to serve as a juror",
+          });
         }
         if (criteria.indictment === "yes") {
           return res.status(400).json({
@@ -352,25 +367,25 @@ async function jurorSignup(req, res) {
           });
         }
       } catch (error) {
-        return res
-          .status(400)
-          .json({ message: "Invalid criteria responses format" });
+        return res.status(400).json({
+          message: "Invalid criteria responses format",
+        });
       }
     }
 
     // Check if email already exists
     const existingJuror = await findJurorByEmail(email.toLowerCase().trim());
     if (existingJuror) {
-      return res
-        .status(409)
-        .json({ message: "An account with this email already exists" });
+      return res.status(409).json({
+        message: "An account with this email already exists",
+      });
     }
 
     // Hash password
     const saltRounds = 12;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
-    // Prepare data for database - UPDATED to handle frontend data structure
+    // Prepare data for database - handle empty strings properly
     const jurorData = {
       // Required fields
       name: name.trim(),
@@ -378,24 +393,24 @@ async function jurorSignup(req, res) {
       address1: address1.trim(),
       address2: address2?.trim() || null,
       city: city.trim(),
-      state: state.trim(), // Accept full state name from frontend
+      state: state.trim(),
       zipCode: zipCode.trim(),
       county: county.trim(),
 
-      // Store codes if provided (for future use)
-      cityCode: cityCode || null,
-      stateCode: stateCode || null,
-      countyCode: countyCode || null,
+      // Store codes if provided
+      cityCode: cityCode?.trim() || null,
+      stateCode: stateCode?.trim() || null,
+      countyCode: countyCode?.trim() || null,
 
-      // Optional demographics
+      // Optional demographics - convert empty strings to null
       maritalStatus: maritalStatus?.trim() || null,
       spouseEmployer: spouseEmployer?.trim() || null,
       employerName: employerName?.trim() || null,
       employerAddress: employerAddress?.trim() || null,
-      yearsInCounty: yearsInCounty || null,
-      ageRange: ageRange || null,
-      gender: gender || null,
-      education: education || null,
+      yearsInCounty: yearsInCounty?.trim() || null,
+      ageRange: ageRange?.trim() || null,
+      gender: gender?.trim() || null,
+      education: education?.trim() || null,
 
       // Payment and auth
       paymentMethod: paymentMethod.toLowerCase(),
@@ -405,11 +420,13 @@ async function jurorSignup(req, res) {
       userAgreementAccepted: Boolean(userAgreementAccepted),
     };
 
-    console.log("Creating juror with data:", {
+    console.log("Creating juror with final data:", {
       name: jurorData.name,
+      email: jurorData.email,
       state: jurorData.state,
       county: jurorData.county,
       city: jurorData.city,
+      paymentMethod: jurorData.paymentMethod,
     });
 
     // Create juror record
@@ -422,9 +439,9 @@ async function jurorSignup(req, res) {
     });
   } catch (error) {
     console.error("Juror signup error:", error);
-    res
-      .status(500)
-      .json({ message: "Internal server error. Please try again later." });
+    res.status(500).json({
+      message: "Internal server error. Please try again later.",
+    });
   }
 }
 

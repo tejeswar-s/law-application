@@ -11,7 +11,7 @@ export interface LocationOption {
   value: string;
 }
 
-// Attorney Types
+// Attorney Types - NO CHANGES NEEDED, already has verificationToken
 export interface AttorneyFormData {
   // Step 1 - Personal Details
   isAttorney: boolean;
@@ -41,10 +41,10 @@ export interface AttorneyFormData {
   
   // Step 4 - Agreement
   userAgreementAccepted: boolean;
-  verificationToken: string;
+  verificationToken: string; // Already exists!
 }
 
-// Juror Types
+// Juror Types (unchanged)
 export interface CriteriaAnswers {
   age: string;
   citizen: string;
@@ -90,7 +90,7 @@ export interface JurorFormData {
   cityCode: string;
 }
 
-// Common State
+// Common State (unchanged)
 export interface SignupState {
   step: SignupStep;
   personalSubStep: 1 | 2;
@@ -102,7 +102,7 @@ export interface SignupState {
   hasScrolledToBottom: boolean;
 }
 
-// Actions
+// Actions (unchanged)
 export type SignupAction =
   | { type: 'SET_STEP'; payload: SignupStep }
   | { type: 'SET_PERSONAL_SUB_STEP'; payload: 1 | 2 }

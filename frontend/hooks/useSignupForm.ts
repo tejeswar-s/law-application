@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useEffect } from 'react';
+import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { SignupState, SignupAction, UserType, AttorneyFormData, JurorFormData } from '../types/signup.types';
 
 const initialAttorneyData: AttorneyFormData = {
@@ -109,10 +109,13 @@ function signupReducer(state: SignupState, action: SignupAction): SignupState {
       return { ...state, error: action.payload };
     
     case 'SET_SCROLLED_TO_BOTTOM':
-      return { ...state, hasScrolledToBottom: action.payload };
+      if (state.hasScrolledToBottom !== action.payload) {
+        return { ...state, hasScrolledToBottom: action.payload };
+      }
+      return state;
     
     case 'RESET_FORM':
-      return createInitialState('attorney'); // Default, should be passed as param
+      return createInitialState('attorney');
     
     default:
       return state;
@@ -121,42 +124,73 @@ function signupReducer(state: SignupState, action: SignupAction): SignupState {
 
 export function useSignupForm(userType: UserType) {
   const [state, dispatch] = useReducer(signupReducer, createInitialState(userType));
+  const persistTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const loadedRef = useRef(false);
 
-  // Persist form data to localStorage
+  // Load draft on mount - ONLY ONCE
   useEffect(() => {
-    const draftKey = `${userType}SignupDraft`;
-    try {
-      localStorage.setItem(draftKey, JSON.stringify({
-        ...state,
-        // Don't persist sensitive data
-        formData: {
-          ...state.formData,
-          password: '',
-          confirmPassword: '',
-        }
-      }));
-    } catch (error) {
-      console.warn('Failed to persist form data:', error);
-    }
-  }, [state, userType]);
-
-  // Load draft on mount
-  useEffect(() => {
+    if (loadedRef.current) return;
+    
     const draftKey = `${userType}SignupDraft`;
     try {
       const stored = localStorage.getItem(draftKey);
       if (stored) {
         const draft = JSON.parse(stored);
-        // Restore non-sensitive data
-        dispatch({ type: 'UPDATE_FORM_DATA', payload: draft.formData });
-        dispatch({ type: 'SET_STEP', payload: draft.step || 1 });
-        dispatch({ type: 'SET_PERSONAL_SUB_STEP', payload: draft.personalSubStep || 1 });
-        dispatch({ type: 'SET_AUTH_SUB_STEP', payload: draft.authSubStep || 1 });
+        // Restore ALL data including password during signup flow
+        if (draft.formData) {
+          dispatch({ type: 'UPDATE_FORM_DATA', payload: draft.formData });
+        }
+        if (draft.step) {
+          dispatch({ type: 'SET_STEP', payload: draft.step });
+        }
+        if (draft.personalSubStep) {
+          dispatch({ type: 'SET_PERSONAL_SUB_STEP', payload: draft.personalSubStep });
+        }
+        if (draft.authSubStep) {
+          dispatch({ type: 'SET_AUTH_SUB_STEP', payload: draft.authSubStep });
+        }
+        if (typeof draft.hasScrolledToBottom === 'boolean') {
+          dispatch({ type: 'SET_SCROLLED_TO_BOTTOM', payload: draft.hasScrolledToBottom });
+        }
       }
     } catch (error) {
       console.warn('Failed to load form draft:', error);
     }
+    
+    loadedRef.current = true;
   }, [userType]);
+
+  // Persist to localStorage - KEEP PASSWORD during signup flow
+  useEffect(() => {
+    if (!loadedRef.current) return;
+    
+    if (persistTimeoutRef.current) {
+      clearTimeout(persistTimeoutRef.current);
+    }
+    
+    persistTimeoutRef.current = setTimeout(() => {
+      const draftKey = `${userType}SignupDraft`;
+      try {
+        const draftData = {
+          step: state.step,
+          personalSubStep: state.personalSubStep,
+          authSubStep: state.authSubStep,
+          formData: state.formData, // Keep ALL data including password during signup
+          hasScrolledToBottom: state.hasScrolledToBottom
+        };
+        
+        localStorage.setItem(draftKey, JSON.stringify(draftData));
+      } catch (error) {
+        console.warn('Failed to persist form data:', error);
+      }
+    }, 200); // Faster persist for better UX
+
+    return () => {
+      if (persistTimeoutRef.current) {
+        clearTimeout(persistTimeoutRef.current);
+      }
+    };
+  }, [state, userType]);
 
   const actions = {
     setStep: useCallback((step: SignupState['step']) => {
@@ -198,6 +232,16 @@ export function useSignupForm(userType: UserType) {
     resetForm: useCallback(() => {
       dispatch({ type: 'RESET_FORM' });
     }, []),
+
+    // Add method to clear sensitive data after successful signup
+    clearSensitiveData: useCallback(() => {
+      const draftKey = `${userType}SignupDraft`;
+      try {
+        localStorage.removeItem(draftKey);
+      } catch (error) {
+        console.warn('Failed to clear sensitive data:', error);
+      }
+    }, [userType]),
   };
 
   return { state, actions };
