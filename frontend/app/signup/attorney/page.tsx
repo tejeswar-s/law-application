@@ -9,6 +9,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
+import router from 'next/router';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 

@@ -1,242 +1,123 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Users, UserCheck, Calendar, FileText, AlertCircle, CheckCircle2, Clock, Building2, X, Eye, EyeOff } from "lucide-react";
+import { Users, UserCheck, Calendar, FileText, AlertCircle, CheckCircle2, Clock, Building2 } from "lucide-react";
 
 const BLUE = "#0A2342";
 const BG = "#FAF9F6";
 const LIGHT_BLUE = "#e6ecf5";
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const ACCENT_YELLOW = "#F6E27F";
 
 type Attorney = {
-  AttorneyId: number;
-  FirstName: string;
-  LastName: string;
-  LawFirmName: string;
-  Email: string;
-  State: string;
-  StateBarNumber: string;
-  VerificationStatus: string;
-  IsVerified: boolean;
-  CreatedAt: string;
+  id: string;
+  name: string;
+  email: string;
+  barNumber: string;
+  verified: boolean;
 };
 
 type Juror = {
-  JurorId: number;
-  Name: string;
-  Email: string;
-  County: string;
-  State: string;
-  VerificationStatus: string;
-  IsVerified: boolean;
-  IsActive: boolean;
-  OnboardingCompleted: boolean;
-  CriteriaResponses?: string;
-  CreatedAt: string;
-};
-
-type Trial = {
-  CaseId: number;
-  CaseNumber: string;
-  Title: string;
-  ScheduledStartTime: string;
-  ScheduledEndTime: string;
-  CourtRoomNumber: string;
-  Status: string;
-  ActualStartTime?: string;
-  ActualEndTime?: string;
-  Notes?: string;
-};
-
-type CriteriaAnswer = {
-  age?: string;
-  citizen?: string;
-  work1?: string;
-  work2?: string;
-  felony?: string;
-  indictment?: string;
+  id: string;
+  name: string;
+  email: string;
+  age: string;
+  county: string;
+  verified: boolean;
 };
 
 export default function AdminDashboard() {
   const [attorneys, setAttorneys] = useState<Attorney[]>([]);
   const [jurors, setJurors] = useState<Juror[]>([]);
-  const [todayTrials, setTodayTrials] = useState<Trial[]>([]);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<{ [key: string]: boolean }>({});
-  
-  // Modal states
-  const [selectedJuror, setSelectedJuror] = useState<Juror | null>(null);
-  const [showCriteriaModal, setShowCriteriaModal] = useState(false);
-  const [declineReason, setDeclineReason] = useState("");
-  const [showDeclineModal, setShowDeclineModal] = useState(false);
-  const [declineTarget, setDeclineTarget] = useState<{ type: 'attorney' | 'juror', id: number } | null>(null);
+  const [cases, setCases] = useState<any[]>([]);
 
   useEffect(() => {
-    fetchAllData();
+    const fetchCases = async () => {
+      try {
+        const res = await fetch("http://localhost:4000/api/cases");
+        const data = await res.json();
+
+        const casesData = Array.isArray(data)
+          ? data
+          : Array.isArray(data.recordset)
+          ? data.recordset
+          : [];
+
+        setCases(
+          casesData.map((c: any) => ({
+            id: c.Id,
+            caseNumber: c.CaseNumber || `Case #${c.Id}`,
+            scheduledDate: c.ScheduledDate,
+            scheduledTime: c.ScheduledTime,
+            courtroom: c.Courtroom || `ACS Courtroom`,
+            debriefing: c.DebriefingStart || "_____",
+            endingTime: c.EndingTime || "_____",
+          }))
+        );
+      } catch (err) {
+        console.error("Error fetching cases:", err);
+      }
+    };
+
+    fetchCases();
   }, []);
 
-  const fetchAllData = async () => {
-    setLoading(true);
-    try {
-      const [attRes, jurRes, trialsRes] = await Promise.all([
-        fetch(`${API_BASE}/api/admin/attorneys`),
-        fetch(`${API_BASE}/api/admin/jurors`),
-        fetch(`${API_BASE}/api/admin/today-trials`)
-      ]);
-      
-      const attData = await attRes.json();
-      const jurData = await jurRes.json();
-      const trialsData = await trialsRes.json();
-      
-      setAttorneys(attData.attorneys || attData);
-      setJurors(jurData.jurors || jurData);
-      setTodayTrials(trialsData);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [attRes, jurRes] = await Promise.all([
+          fetch("http://localhost:4000/api/admin/attorneys"),
+          fetch("http://localhost:4000/api/admin/jurors"),
+        ]);
+        const attData = await attRes.json();
+        const jurData = await jurRes.json();
+        console.log(attData);
+        console.log(jurData);
+        setAttorneys(attData.attorneys || attData);
+        setJurors(jurData.jurors || jurData);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const handleVerifyAttorney = async (attorneyId: number) => {
-    setActionLoading(prev => ({ ...prev, [`attorney_${attorneyId}`]: true }));
     try {
-      const response = await fetch(`${API_BASE}/api/admin/attorneys/${attorneyId}/verify`, {
-        method: "POST",
-      });
-      
-      if (response.ok) {
-        setAttorneys(prev =>
-          prev.map(a =>
-            a.AttorneyId === attorneyId
-              ? { ...a, VerificationStatus: "verified", IsVerified: true }
-              : a
-          )
-        );
-      }
+      await fetch(
+        `http://localhost:4000/api/admin/attorneys/${attorneyId}/verify`,
+        {
+          method: "POST",
+        }
+      );
+      setAttorneys((prev) =>
+        prev.map((a) =>
+          a.AttorneyId === attorneyId
+            ? { ...a, VerificationStatus: "verified", IsVerified: true }
+            : a
+        )
+      );
     } catch (error) {
       console.error("Error verifying attorney:", error);
-    } finally {
-      setActionLoading(prev => ({ ...prev, [`attorney_${attorneyId}`]: false }));
-    }
-  };
-
-  const handleDeclineAttorney = async (attorneyId: number, reason: string) => {
-    setActionLoading(prev => ({ ...prev, [`attorney_${attorneyId}`]: true }));
-    try {
-      const response = await fetch(`${API_BASE}/api/admin/attorneys/${attorneyId}/decline`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason }),
-      });
-      
-      if (response.ok) {
-        setAttorneys(prev =>
-          prev.map(a =>
-            a.AttorneyId === attorneyId
-              ? { ...a, VerificationStatus: "declined", IsVerified: false }
-              : a
-          )
-        );
-      }
-    } catch (error) {
-      console.error("Error declining attorney:", error);
-    } finally {
-      setActionLoading(prev => ({ ...prev, [`attorney_${attorneyId}`]: false }));
-      setShowDeclineModal(false);
-      setDeclineReason("");
-      setDeclineTarget(null);
     }
   };
 
   const handleVerifyJuror = async (jurorId: number) => {
-    setActionLoading(prev => ({ ...prev, [`juror_${jurorId}`]: true }));
     try {
-      const response = await fetch(`${API_BASE}/api/admin/jurors/${jurorId}/verify`, {
+      await fetch(`http://localhost:4000/api/admin/jurors/${jurorId}/verify`, {
         method: "POST",
       });
-      
-      if (response.ok) {
-        setJurors(prev =>
-          prev.map(j =>
-            j.JurorId === jurorId
-              ? { ...j, VerificationStatus: "verified", IsVerified: true }
-              : j
-          )
-        );
-      }
-    } catch (error) {
-      console.error("Error verifying juror:", error);
-    } finally {
-      setActionLoading(prev => ({ ...prev, [`juror_${jurorId}`]: false }));
-    }
-  };
-
-  const handleDeclineJuror = async (jurorId: number, reason: string) => {
-    setActionLoading(prev => ({ ...prev, [`juror_${jurorId}`]: true }));
-    try {
-      const response = await fetch(`${API_BASE}/api/admin/jurors/${jurorId}/decline`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason }),
-      });
-      
-      if (response.ok) {
-        setJurors(prev =>
-          prev.map(j =>
-            j.JurorId === jurorId
-              ? { ...j, VerificationStatus: "declined", IsVerified: false }
-              : j
-          )
-        );
-      }
-    } catch (error) {
-      console.error("Error declining juror:", error);
-    } finally {
-      setActionLoading(prev => ({ ...prev, [`juror_${jurorId}`]: false }));
-      setShowDeclineModal(false);
-      setDeclineReason("");
-      setDeclineTarget(null);
-    }
-  };
-
-  const openDeclineModal = (type: 'attorney' | 'juror', id: number) => {
-    setDeclineTarget({ type, id });
-    setShowDeclineModal(true);
-  };
-
-  const handleDecline = () => {
-    if (!declineTarget) return;
-    
-    if (declineTarget.type === 'attorney') {
-      handleDeclineAttorney(declineTarget.id, declineReason);
-    } else {
-      handleDeclineJuror(declineTarget.id, declineReason);
-    }
-  };
-
-  const parseCriteriaResponses = (criteriaString: string): CriteriaAnswer => {
-    try {
-      return JSON.parse(criteriaString || '{}');
-    } catch {
-      return {};
-    }
-  };
-
-  const updateTrialNotes = async (caseId: number, notes: string, status: string = 'in_progress') => {
-    try {
-      await fetch(`${API_BASE}/api/admin/trials/${caseId}/update`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes, status }),
-      });
-      
-      setTodayTrials(prev =>
-        prev.map(trial =>
-          trial.CaseId === caseId ? { ...trial, Notes: notes, Status: status } : trial
+      setJurors((prev) =>
+        prev.map((j) =>
+          j.JurorId === jurorId
+            ? { ...j, VerificationStatus: "verified", IsVerified: true }
+            : j
         )
       );
     } catch (error) {
-      console.error("Error updating trial:", error);
+      console.error("Error verifying juror:", error);
     }
   };
 
@@ -385,80 +266,91 @@ export default function AdminDashboard() {
           </div>
 
           {/* Calendar */}
-          <div className="space-y-4">
-            {/* Empty State */}
-            {!Array.isArray(todayTrials) || todayTrials.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-gray-500">
-                <Calendar className="h-12 w-12 text-gray-400 mb-2" />
-                <p>No trials scheduled for today</p>
+          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+            <div className="flex items-center mb-4">
+              <Calendar className="h-6 w-6 mr-3" style={{ color: BLUE }} />
+              <h2 className="text-xl font-semibold" style={{ color: BLUE }}>Interactive Calendar</h2>
+            </div>
+            <div className="flex flex-col items-center justify-center min-h-[300px] bg-gray-50 rounded-lg">
+              <Calendar className="h-16 w-16 text-gray-400 mb-4" />
+              <div className="text-lg font-semibold text-gray-600 mb-2">Calendar Component</div>
+              <div className="text-sm text-gray-500 text-center">
+                Cases identified by Case No.<br />
+                Integration pending - calendar component to be embedded here
               </div>
-            ) : (
-              todayTrials.map((trial) => (
-                <div
-                  key={trial.CaseId}
-                  className="border border-gray-200 rounded-lg p-4"
-                >
-                  {/* Trial Header */}
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <h4 className="font-semibold text-gray-900">
-                        {trial.CaseNumber}
-                      </h4>
-                      <p className="text-sm text-gray-600">{trial.Title}</p>
-                    </div>
-                    <span
-                      className={`px-2 py-1 rounded text-xs font-medium ${getStatusClass(
-                        trial.Status
-                      )}`}
-                    >
-                      {trial.Status.replace("_", " ").toUpperCase()}
-                    </span>
-                  </div>
+            </div>
+          </div>
+        </div>
 
-                  {/* Trial Details */}
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-gray-600">
-                        Scheduled:{" "}
-                        {new Date(trial.ScheduledStartTime).toLocaleTimeString()}
-                      </p>
-                      <p className="text-gray-600">
-                        Courtroom: {trial.CourtRoomNumber}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">
-                        Actual Start:{" "}
-                        {trial.ActualStartTime
-                          ? new Date(trial.ActualStartTime).toLocaleTimeString()
-                          : "Pending"}
-                      </p>
-                      <p className="text-gray-600">
-                        Actual End:{" "}
-                        {trial.ActualEndTime
-                          ? new Date(trial.ActualEndTime).toLocaleTimeString()
-                          : "Pending"}
-                      </p>
-                    </div>
-                  </div>
+        {/* Today's Activities */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Today's Trials */}
+<div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+  <div className="flex items-center mb-4">
+    <Clock className="h-6 w-6 mr-3" style={{ color: BLUE }} />
+    <h3 className="text-xl font-semibold" style={{ color: BLUE }}>
+      Today's Trials
+    </h3>
+  </div>
 
-                  {/* Notes Input */}
-                  <div className="mt-3">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-gray-600">Notes:</span>
-                      <input
-                        className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm"
-                        placeholder="Add notes..."
-                        value={trial.Notes || ""}
-                        onChange={(e) =>
-                          updateTrialNotes(trial.CaseId, e.target.value)
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
+  {cases.length === 0 ? (
+    <div className="text-center text-gray-500 py-8">
+      No trials scheduled today.
+    </div>
+  ) : (
+    <div className="space-y-6">
+      {cases.map((c) => (
+        <div
+          key={c.id}
+          className="border-l-4 pl-4"
+          style={{ borderColor: BLUE }}
+        >
+          <div className="font-semibold text-gray-900 mb-2">
+            {c.caseNumber} – Scheduled Start Time:{" "}
+            {c.scheduledTime || "_____"}
+          </div>
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center text-blue-600 hover:underline cursor-pointer">
+              <span>🔗 Link to {c.courtroom}</span>
+            </div>
+            <div className="text-gray-600">
+              Debriefing Starts: {c.debriefing}
+            </div>
+            <div className="text-gray-600">
+              Actual Ending Time: {c.endingTime}
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-gray-600">Notes:</span>
+              <input className="flex-1 border border-gray-300 rounded px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+
+
+          {/* Today's Notifications */}
+          <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+            <div className="flex items-center mb-4">
+              <AlertCircle className="h-6 w-6 mr-3" style={{ color: BLUE }} />
+              <h3 className="text-xl font-semibold" style={{ color: BLUE }}>Today's Notifications</h3>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3">
+                <span className="text-gray-700 font-medium">Case No.</span>
+                <input className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" />
+              </div>
+              <div className="flex items-center space-x-3">
+                <span className="text-gray-700 font-medium">Case No.</span>
+                <input className="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50" />
+              </div>
+              <button className="w-full mt-4 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                Send Notifications
+              </button>
+            </div>
           </div>
         </div>
 
@@ -521,11 +413,6 @@ export default function AdminDashboard() {
                                 <CheckCircle2 className="h-3 w-3 mr-1" />
                                 Verified
                               </span>
-                            ) : attorney.VerificationStatus === 'declined' ? (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                <X className="h-3 w-3 mr-1" />
-                                Declined
-                              </span>
                             ) : (
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                                 <Clock className="h-3 w-3 mr-1" />
@@ -538,26 +425,15 @@ export default function AdminDashboard() {
                           {new Date(attorney.CreatedAt).toLocaleDateString()}
                         </td>
                         <td className="px-6 py-4 text-center">
-                          {!attorney.IsVerified && attorney.VerificationStatus !== 'declined' && (
-                            <div className="flex justify-center space-x-2">
-                              <button
-                                onClick={() => handleVerifyAttorney(attorney.AttorneyId)}
-                                disabled={actionLoading[`attorney_${attorney.AttorneyId}`]}
-                                className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-white transition-colors hover:shadow-md disabled:opacity-50"
-                                style={{ backgroundColor: BLUE }}
-                              >
-                                <CheckCircle2 className="h-4 w-4 mr-1" />
-                                {actionLoading[`attorney_${attorney.AttorneyId}`] ? 'Loading...' : 'Verify'}
-                              </button>
-                              <button
-                                onClick={() => openDeclineModal('attorney', attorney.AttorneyId)}
-                                disabled={actionLoading[`attorney_${attorney.AttorneyId}`]}
-                                className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors hover:shadow-md disabled:opacity-50"
-                              >
-                                <X className="h-4 w-4 mr-1" />
-                                Decline
-                              </button>
-                            </div>
+                          {!attorney.IsVerified && (
+                            <button
+                              onClick={() => handleVerifyAttorney(attorney.AttorneyId)}
+                              className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-white transition-colors hover:shadow-md"
+                              style={{ backgroundColor: BLUE }}
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              Verify
+                            </button>
                           )}
                         </td>
                       </tr>
@@ -590,7 +466,7 @@ export default function AdminDashboard() {
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Location</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Verification</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Criteria</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Onboarding</th>
                     <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Joined</th>
                     <th className="px-6 py-4 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                   </tr>
@@ -625,11 +501,6 @@ export default function AdminDashboard() {
                               <CheckCircle2 className="h-3 w-3 mr-1" />
                               Verified
                             </span>
-                          ) : juror.VerificationStatus === 'declined' ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                              <X className="h-3 w-3 mr-1" />
-                              Declined
-                            </span>
                           ) : (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                               <Clock className="h-3 w-3 mr-1" />
@@ -649,43 +520,29 @@ export default function AdminDashboard() {
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          {juror.CriteriaResponses && (
-                            <button
-                              onClick={() => {
-                                setSelectedJuror(juror);
-                                setShowCriteriaModal(true);
-                              }}
-                              className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200"
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              View
-                            </button>
+                          {juror.OnboardingCompleted ? (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                              Complete
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                              Pending
+                            </span>
                           )}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
                           {new Date(juror.CreatedAt).toLocaleDateString()}
                         </td>
                         <td className="px-6 py-4 text-center">
-                          {!juror.IsVerified && juror.VerificationStatus !== 'declined' && (
-                            <div className="flex justify-center space-x-2">
-                              <button
-                                onClick={() => handleVerifyJuror(juror.JurorId)}
-                                disabled={actionLoading[`juror_${juror.JurorId}`]}
-                                className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-white transition-colors hover:shadow-md disabled:opacity-50"
-                                style={{ backgroundColor: BLUE }}
-                              >
-                                <CheckCircle2 className="h-4 w-4 mr-1" />
-                                {actionLoading[`juror_${juror.JurorId}`] ? 'Loading...' : 'Verify'}
-                              </button>
-                              <button
-                                onClick={() => openDeclineModal('juror', juror.JurorId)}
-                                disabled={actionLoading[`juror_${juror.JurorId}`]}
-                                className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors hover:shadow-md disabled:opacity-50"
-                              >
-                                <X className="h-4 w-4 mr-1" />
-                                Decline
-                              </button>
-                            </div>
+                          {!juror.IsVerified && (
+                            <button
+                              onClick={() => handleVerifyJuror(juror.JurorId)}
+                              className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-white transition-colors hover:shadow-md"
+                              style={{ backgroundColor: BLUE }}
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              Verify
+                            </button>
                           )}
                         </td>
                       </tr>
@@ -697,143 +554,6 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
-
-      {/* Criteria Modal */}
-      {showCriteriaModal && selectedJuror && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-semibold" style={{ color: BLUE }}>
-                  Criteria Responses - {selectedJuror.Name}
-                </h3>
-                <button
-                  onClick={() => {
-                    setShowCriteriaModal(false);
-                    setSelectedJuror(null);
-                  }}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
-            </div>
-            
-            <div className="p-6">
-              {(() => {
-                const criteria = parseCriteriaResponses(selectedJuror.CriteriaResponses || '{}');
-                return (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <p className="font-medium text-gray-700 mb-2">Are you at least 18 years old?</p>
-                        <p className={`font-semibold ${criteria.age === 'yes' ? 'text-green-600' : 'text-red-600'}`}>
-                          {criteria.age === 'yes' ? 'Yes' : criteria.age === 'no' ? 'No' : 'Not answered'}
-                        </p>
-                      </div>
-                      
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <p className="font-medium text-gray-700 mb-2">Are you a US citizen?</p>
-                        <p className={`font-semibold ${criteria.citizen === 'yes' ? 'text-green-600' : 'text-red-600'}`}>
-                          {criteria.citizen === 'yes' ? 'Yes' : criteria.citizen === 'no' ? 'No' : 'Not answered'}
-                        </p>
-                      </div>
-                      
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <p className="font-medium text-gray-700 mb-2">Do you/family work for law firm, insurance, or claims company?</p>
-                        <p className={`font-semibold ${criteria.work1 === 'no' ? 'text-green-600' : 'text-yellow-600'}`}>
-                          {criteria.work1 === 'yes' ? 'Yes' : criteria.work1 === 'no' ? 'No' : 'Not answered'}
-                        </p>
-                      </div>
-                      
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <p className="font-medium text-gray-700 mb-2">Worked for law firm, insurance, or claims in past year?</p>
-                        <p className={`font-semibold ${criteria.work2 === 'no' ? 'text-green-600' : 'text-yellow-600'}`}>
-                          {criteria.work2 === 'yes' ? 'Yes' : criteria.work2 === 'no' ? 'No' : 'Not answered'}
-                        </p>
-                      </div>
-                      
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <p className="font-medium text-gray-700 mb-2">Convicted of felony?</p>
-                        <p className={`font-semibold ${criteria.felony === 'no' ? 'text-green-600' : 'text-yellow-600'}`}>
-                          {criteria.felony === 'yes' ? 'Yes' : criteria.felony === 'no' ? 'No' : 'Not answered'}
-                        </p>
-                      </div>
-                      
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <p className="font-medium text-gray-700 mb-2">Currently under indictment?</p>
-                        <p className={`font-semibold ${criteria.indictment === 'no' ? 'text-green-600' : 'text-red-600'}`}>
-                          {criteria.indictment === 'yes' ? 'Yes' : criteria.indictment === 'no' ? 'No' : 'Not answered'}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {/* Eligibility Summary */}
-                    <div className="mt-6 p-4 rounded-lg border-2" style={{ 
-                      backgroundColor: (criteria.age === 'yes' && criteria.citizen === 'yes' && criteria.indictment !== 'yes') ? '#f0fdf4' : '#fef2f2',
-                      borderColor: (criteria.age === 'yes' && criteria.citizen === 'yes' && criteria.indictment !== 'yes') ? '#16a34a' : '#dc2626'
-                    }}>
-                      <p className="font-semibold text-lg mb-2">Eligibility Status</p>
-                      <p className={`font-medium ${(criteria.age === 'yes' && criteria.citizen === 'yes' && criteria.indictment !== 'yes') ? 'text-green-700' : 'text-red-700'}`}>
-                        {(criteria.age === 'yes' && criteria.citizen === 'yes' && criteria.indictment !== 'yes') 
-                          ? '✓ Meets basic eligibility requirements' 
-                          : '✗ Does not meet basic eligibility requirements'}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Decline Modal */}
-      {showDeclineModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-md w-full">
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-xl font-semibold" style={{ color: BLUE }}>
-                Decline {declineTarget?.type === 'attorney' ? 'Attorney' : 'Juror'}
-              </h3>
-            </div>
-            
-            <div className="p-6">
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Reason for declining (optional):
-                </label>
-                <textarea
-                  value={declineReason}
-                  onChange={(e) => setDeclineReason(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={4}
-                  placeholder="Provide a reason for declining this application..."
-                />
-              </div>
-              
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => {
-                    setShowDeclineModal(false);
-                    setDeclineReason("");
-                    setDeclineTarget(null);
-                  }}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDecline}
-                  className="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700"
-                >
-                  Decline
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }
