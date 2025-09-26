@@ -15,36 +15,15 @@ const config = {
   },
 };
 router.get("/cases", async (req, res) => {
+  // Example: get user from query param (for demo; use JWT/session in production)
   const userId = req.query.userId;
-  
-  try {
-    await sql.connect(config);
-    console.log("Received userId:", userId);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    if (!userId) {
-      return res.status(400).json({ error: "userId is required" });
-    }
-
-    console.log("Filtering for attorneyEmail:", userId);
-    const result = await sql.query`
-      SELECT * FROM ScheduledTrials 
-      WHERE Email = ${userId.trim()} 
-      ORDER BY Id DESC
-    `;
-    
-    console.log("Query result:", result.recordset);
-    
-    if (result.recordset.length === 0) {
-      return res.json([]);
-    }
-
-    return res.json(result.recordset);
-  } catch (error) {
-    console.error("Database error:", error);
-    return res.status(500).json({ error: "Database error occurred" });
-  } finally {
-    sql.close();
-  }
+  await sql.connect(config);
+  const result = await sql.query`
+    SELECT * FROM ScheduledTrials WHERE UserId = ${userId} ORDER BY Id DESC
+  `;
+  res.json(result.recordset);
 });
 
 router.get("/cases/:id", async (req, res) => {
