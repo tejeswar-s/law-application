@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
@@ -10,16 +10,75 @@ export default function CaseDetailsPage() {
   const [caseTier, setCaseTier] = useState("");
   const [caseDescription, setCaseDescription] = useState("");
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [caseTypeSelection, setCaseTypeSelection] = useState<string | null>(null);
+  const [availableStates, setAvailableStates] = useState<{ label: string; value: string }[]>([]);
+  const [availableCounties, setAvailableCounties] = useState<{ label: string; value: string }[]>([]);
+  const [countiesLoading, setCountiesLoading] = useState(false);
   const router = useRouter();
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setCaseTypeSelection(localStorage.getItem("caseTypeSelection"));
+    }
+  }, []);
+
+  // Fetch states on mount
+  useEffect(() => {
+    async function fetchStates() {
+      try {
+        const res = await fetch("https://api.census.gov/data/2020/dec/pl?get=NAME&for=state:*");
+        const data = await res.json();
+        setAvailableStates(
+          data.slice(1).map((row: [string, string]) => ({
+            label: row[0],
+            value: row[1]
+          }))
+        );
+      } catch (error) {
+        setAvailableStates([]);
+      }
+    }
+    fetchStates();
+  }, []);
+
+  // Fetch counties when state changes
+  useEffect(() => {
+    async function fetchCounties() {
+      if (state) {
+        setCountiesLoading(true);
+        try {
+          const stateCode = state.padStart(2, "0");
+          const res = await fetch(
+            `https://api.census.gov/data/2020/dec/pl?get=NAME&for=county:*&in=state:${stateCode}`
+          );
+          const data = await res.json();
+          setAvailableCounties(
+            data.slice(1).map((row: [string, string, string]) => ({
+              label: row[0],
+              value: row[2]
+            }))
+          );
+        } catch (error) {
+          setAvailableCounties([]);
+        } finally {
+          setCountiesLoading(false);
+        }
+      } else {
+        setAvailableCounties([]);
+      }
+    }
+    fetchCounties();
+  }, [state]);
+
   const steps = [
-  "Case Details",
-  "Plaintiff Details",
-  "Defendant Details",
-  "Voir Dire Part 1 & 2",
-  "Payment Details",
-  "Review & Submit",
-];
+    "Case Details",
+    "Plaintiff Details",
+    "Defendant Details",
+    "Voir Dire Part 1 & 2",
+    "Payment Details",
+    "Review & Submit",
+  ];
+
   const validate = () => {
     const errors: Record<string, string> = {};
     if (!state) errors.state = "State is required";
@@ -39,10 +98,6 @@ export default function CaseDetailsPage() {
     localStorage.setItem("caseType", caseType);
     localStorage.setItem("caseTier", caseTier);
     localStorage.setItem("caseDescription", caseDescription);
-    // localStorage.setItem("paymentMethod", paymentMethod);
-    // localStorage.setItem("paymentAmount", paymentAmount);
-    // localStorage.setItem("plaintiffGroups", JSON.stringify(plaintiffGroups));
-    // localStorage.setItem("defendantGroups", JSON.stringify(defendantGroups));
     router.push("/attorney/state/plaintiff-details");
   };
 
@@ -105,7 +160,7 @@ export default function CaseDetailsPage() {
         <div className="flex-1 flex flex-col pl-28">
           <div className="w-full max-w-2xl">
             <h1 className="text-3xl font-bold text-[#16305B] mb-8 mt-2">
-              Case Details
+              Case Details {caseTypeSelection ? `(${caseTypeSelection.charAt(0).toUpperCase() + caseTypeSelection.slice(1)})` : ""}
             </h1>
             <form className="space-y-6" onSubmit={handleNext}>
               {/* State */}
@@ -119,10 +174,9 @@ export default function CaseDetailsPage() {
                   className="w-full px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
                 >
                   <option value="">Select State</option>
-                  <option value="California">California</option>
-                  <option value="Texas">Texas</option>
-                  <option value="New York">New York</option>
-                  {/* Add more states */}
+                  {availableStates.map(s => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
                 </select>
                 {validationErrors.state && (
                   <p className="text-red-500 text-sm mt-1">{validationErrors.state}</p>
@@ -134,20 +188,22 @@ export default function CaseDetailsPage() {
                 <label className="block mb-1 text-[#16305B] font-medium">
                   County <span className="text-red-500">*</span>
                 </label>
-                <select
-                  value={county}
-                  onChange={e => setCounty(e.target.value)}
-                  className="w-full px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
-                >
-                  <option value="">Select County</option>
-                  <option value="County A">County A</option>
-                  <option value="County B">County B</option>
-                  <option value="County C">County C</option>
-                  {/* Add more counties */}
-                </select>
-                {validationErrors.county && (
-                  <p className="text-red-500 text-sm mt-1">{validationErrors.county}</p>
-                )}
+                <div className="relative z-10">
+                  <select
+                    value={county}
+                    onChange={e => setCounty(e.target.value)}
+                    className="w-full px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
+                    disabled={!state || countiesLoading}
+                  >
+                    <option value="">Select County</option>
+                    {availableCounties.map(c => (
+                      <option key={c.value} value={c.label}>{c.label}</option>
+                    ))}
+                  </select>
+                  {validationErrors.county && (
+                    <p className="text-red-500 text-sm mt-1">{validationErrors.county}</p>
+                  )}
+                </div>
               </div>
 
               {/* Type of Trial Case */}

@@ -26,7 +26,7 @@ function Question({ label, name, value, onChange, error }: QuestionProps) {
       error={error}
     >
       <div className="flex gap-6">
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-2 text-gray-600">
           <input 
             type="radio" 
             name={name} 
@@ -37,7 +37,7 @@ function Question({ label, name, value, onChange, error }: QuestionProps) {
           /> 
           <span>Yes</span>
         </label>
-        <label className="flex items-center gap-2">
+        <label className="flex items-center gap-2 text-gray-600">
           <input 
             type="radio" 
             name={name} 

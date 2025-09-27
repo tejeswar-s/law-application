@@ -96,6 +96,8 @@ export default function AttorneyHomeSection() {
   const [eventView, setEventView] = useState<"calendar" | "list">("list");
   const [showHelp, setShowHelp] = useState(false);
   const [showContact, setShowContact] = useState(false);
+  const [page, setPage] = useState(1);
+  const CASES_PER_PAGE = 5;
   const router = useRouter();
 
   useEffect(() => {
@@ -109,6 +111,8 @@ export default function AttorneyHomeSection() {
     if (user) {
       setLoading(true);
       // Use user.email here, no need to redeclare user
+      console.log("Fetching cases for user:", user.email);
+      console.log("API URL:", `${API_BASE}/api/cases?userId=${encodeURIComponent(user.email)}`);
       fetch(`${API_BASE}/api/cases?userId=${encodeURIComponent(user.email)}`)
         .then(res => res.json())
         .then(data => setCases(data))
@@ -120,11 +124,13 @@ export default function AttorneyHomeSection() {
   }, [user]);
 
   const handleNewCase = () => {
-    router.push("/attorney/state/case-details");
+    router.push("/attorney/state/case-type");
   };
 
   const grouped = groupCasesByDate(cases);
   const sortedDates = Object.keys(grouped).sort();
+  const paginatedCases = cases.slice((page - 1) * CASES_PER_PAGE, page * CASES_PER_PAGE);
+  const totalPages = Math.ceil(cases.length / CASES_PER_PAGE);
 
   if (showContact) {
     return <AttorneyContact onBack={() => { setShowContact(false); setShowHelp(true); }} />;
@@ -162,50 +168,68 @@ export default function AttorneyHomeSection() {
             <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-[#16305B]" />
           </div>
         ) : cases.length > 0 ? (
-          <div className="flex gap-6 flex-wrap">
-            {cases.map((c) => (
-              <div
-                key={c.Id}
-                className="bg-white rounded shadow p-6 w-80 flex flex-col justify-between mb-4 text-black"
-              >
-                <div>
-                  {/* Case Name */}
-                  <div className="font-bold text-xl mb-1">
-                    {getCaseName(c.PlaintiffGroups, c.DefendantGroups)}
+          <>
+            <div className="flex gap-3 flex-wrap">
+              {paginatedCases.map((c) => (
+                <div
+                  key={c.Id}
+                  className="bg-white rounded shadow p-3 w-56 flex flex-col justify-between mb-3 text-black"
+                >
+                  <div>
+                    <div className="font-bold text-md mb-1">
+                      {getCaseName(c.PlaintiffGroups, c.DefendantGroups)}
+                    </div>
+                    <div className="text-xs text-gray-700 mb-1">Case # {c.Id}</div>
+                    <div className="text-[#B10000] font-bold text-xs mb-2">
+                      {getTimeWarning(c.ScheduledDate, c.ScheduledTime)}
+                    </div>
                   </div>
-                  {/* Case Number */}
-                  <div className="text-md text-gray-700 mb-1">Case # {c.Id}</div>
-                  {/* Red warning */}
-                  <div className="text-[#B10000] font-bold text-md mb-4">
-                    {getTimeWarning(c.ScheduledDate, c.ScheduledTime)}
-                  </div>
-                </div>
-                <div>
-                  {/* Blue Finish War room button with arrow icon */}
-                  <button
-                    onClick={() => router.push(`/attorney/cases/${c.Id}/war-room`)}
-                    className="mt-2 px-6 py-2 bg-[#16305B] text-white rounded flex items-center gap-2 text-lg font-semibold"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-5 w-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
+                  <div>
+                    <button
+                      onClick={() => router.push(`/attorney/cases/${c.Id}/war-room`)}
+                      className="mt-2 px-3 py-1 bg-[#16305B] text-white rounded flex items-center gap-2 text-sm font-semibold"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M17 8l4 4m0 0l-4 4m4-4H3"
-                      />
-                    </svg>
-                    Finish War Room
-                  </button>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M17 8l4 4m0 0l-4 4m4-4H3"
+                        />
+                      </svg>
+                      War Room
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            {/* Pagination Controls */}
+            <div className="flex justify-center items-center mt-4 gap-4">
+              <button
+                className="px-3 py-1 rounded bg-[#e6eefc] text-[#16305B] font-semibold disabled:opacity-50"
+                onClick={() => setPage(page - 1)}
+                disabled={page === 1}
+              >
+                Prev
+              </button>
+              <span className="text-[#16305B] font-semibold">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                className="px-3 py-1 rounded bg-[#e6eefc] text-[#16305B] font-semibold disabled:opacity-50"
+                onClick={() => setPage(page + 1)}
+                disabled={page === totalPages}
+              >
+                Next
+              </button>
+            </div>
+          </>
         ) : (
           <div className="bg-white rounded shadow p-8 flex flex-col items-center justify-center min-h-[120px]">
             <p className="text-[#6B7280] mb-2">You do not have any active cases.</p>
@@ -232,12 +256,7 @@ export default function AttorneyHomeSection() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[#16305B] font-semibold">View</span>
-            <button
-              className={`bg-[#e6eefc] px-2 py-1 rounded ${eventView === "calendar" ? "ring-2 ring-[#16305B]" : ""}`}
-              onClick={() => setEventView("calendar")}
-            >
-              <span role="img" aria-label="calendar">📅</span>
-            </button>
+            
             <button
               className={`bg-[#e6eefc] px-2 py-1 rounded ${eventView === "list" ? "ring-2 ring-[#16305B]" : ""}`}
               onClick={() => setEventView("list")}
@@ -253,84 +272,47 @@ export default function AttorneyHomeSection() {
           <span className="absolute top-4 right-6 text-sm text-gray-500">
             Source: <span role="img" aria-label="outlook">📧</span>
           </span>
-          {eventView === "calendar" ? (
-            <>
-              <CalendarMock selectedDates={sortedDates} />
-              <div className="flex-1 pl-8">
-                {/* List of events for selected dates, similar to your screenshot */}
-                {sortedDates.length === 0 ? (
-                  <div className="text-gray-500">No upcoming events.</div>
-                ) : (
-                  <div>
-                    {sortedDates.map(date => (
-                      <div key={date} className="mb-4 flex">
-                        <div className="w-48 font-semibold text-[#363636]">
-                          {isToday(parseISO(date))
-                            ? `Today, ${format(parseISO(date), "MMMM d")}`
-                            : format(parseISO(date), "EEE, MMMM d")}
-                        </div>
-                        <div className="flex-1">
-                          {grouped[date].map(ev => (
-                            <div key={ev.Id} className="mb-1">
-                              <span className="font-medium text-black">
-                                {ev.ScheduledTime && (
-                                  <span>{ev.ScheduledTime} </span>
-                                )}
-                                {getCaseName(ev.PlaintiffGroups, ev.DefendantGroups)} War Room due
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          ) : (
-            // List view (your current implementation)
-            <div className="flex-1">
-              {sortedDates.length === 0 ? (
-                <div className="text-gray-500">No upcoming events.</div>
-              ) : (
-                <div>
-                  {sortedDates.map(date => {
-                    let dateLabel = "Invalid date";
-                    let parsed: Date | null = null;
-                    try {
-                      parsed = parseISO(date);
-                      if (!isNaN(parsed.getTime())) {
-                        dateLabel = isToday(parsed)
-                          ? `Today, ${format(parsed, "MMMM d")}`
-                          : format(parsed, "EEE, MMMM d");
-                      }
-                    } catch {
-                      // leave as "Invalid date"
+          <div className="flex-1">
+            {sortedDates.length === 0 ? (
+              <div className="text-gray-500">No upcoming events.</div>
+            ) : (
+              <div>
+                {sortedDates.map(date => {
+                  let dateLabel = "Invalid date";
+                  let parsed: Date | null = null;
+                  try {
+                    parsed = parseISO(date);
+                    if (!isNaN(parsed.getTime())) {
+                      dateLabel = isToday(parsed)
+                        ? `Today, ${format(parsed, "MMMM d")}`
+                        : format(parsed, "EEE, MMMM d");
                     }
-                    return (
-                      <div key={date} className="mb-4 flex">
-                        <div className="w-48 font-semibold text-[#363636]">
-                          {dateLabel}
-                        </div>
-                        <div className="flex-1">
-                          {grouped[date].map(ev => (
-                            <div key={ev.Id} className="mb-1">
-                              <span className="font-medium text-black">
-                                {ev.ScheduledTime && (
-                                  <span>{ev.ScheduledTime} </span>
-                                )}
-                                {getCaseName(ev.PlaintiffGroups, ev.DefendantGroups)} War Room due
-                              </span>
-                            </div>
-                          ))}
-                        </div>
+                  } catch {
+                    // leave as "Invalid date"
+                  }
+                  return (
+                    <div key={date} className="mb-4 flex">
+                      <div className="w-48 font-semibold text-[#363636]">
+                        {dateLabel}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                      <div className="flex-1">
+                        {grouped[date].map(ev => (
+                          <div key={ev.Id} className="mb-1">
+                            <span className="font-medium text-black">
+                              {ev.ScheduledTime && (
+                                <span>{ev.ScheduledTime} </span>
+                              )}
+                              {getCaseName(ev.PlaintiffGroups, ev.DefendantGroups)} War Room due
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <div className="absolute bottom-4 right-6 flex items-center text-green-600 text-sm">
             <span className="mr-1">✔️</span> Calendar sync up to date
           </div>
@@ -339,18 +321,3 @@ export default function AttorneyHomeSection() {
     </main>
   );
 }
-
-// Example frontend API call
-const fetchCases = async (userId) => {
-  try {
-    const response = await fetch(`/api/cases?userId=${encodeURIComponent(userId)}`);
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to fetch cases');
-    }
-    return data;
-  } catch (error) {
-    console.error('Error fetching cases:', error);
-    throw error;
-  }
-};

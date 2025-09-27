@@ -20,7 +20,7 @@ export default function LogoutOverlay({ open, onClose, onSignOut }: LogoutOverla
         >
           &times;
         </button>
-        <h2 className="text-2xl font-bold mb-2">Sign out</h2>
+        <h2 className="text-2xl font-bold mb-2 text-gray-800">Sign out</h2>
         <p className="mb-6 text-gray-700">Are you sure you want to sign out?</p>
         <div className="flex justify-end gap-2">
           <button

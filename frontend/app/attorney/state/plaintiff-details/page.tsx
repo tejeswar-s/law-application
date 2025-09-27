@@ -80,6 +80,19 @@ export default function PlaintiffDetailsPage() {
     setGroups([...groups, { reps: [{ name: "", email: "" }], plaintiffs: [{ name: "", email: "" }] }]);
   };
 
+  const removePlaintiff = (gIdx: number, pIdx: number) => {
+    const newGroups = [...groups];
+    newGroups[gIdx].plaintiffs.splice(pIdx, 1);
+    setGroups(newGroups);
+  };
+
+  const removeGroup = (gIdx: number) => {
+    if (groups.length === 1) return; // Prevent removing the last group
+    const newGroups = [...groups];
+    newGroups.splice(gIdx, 1);
+    setGroups(newGroups);
+  };
+
   return (
     <div className="min-h-screen flex bg-[#faf8f3] font-sans">
       {/* Sidebar */}
@@ -143,10 +156,20 @@ export default function PlaintiffDetailsPage() {
             </h1>
             <form className="space-y-6" onSubmit={handleNext}>
               {groups.map((group, gIdx) => (
-                <div key={gIdx} className="p-4 border rounded-md bg-white space-y-4">
+                <div key={gIdx} className="p-4 border rounded-md bg-white space-y-4 relative">
                   <h2 className="text-lg font-semibold text-[#16305B]">
                     Plaintiff Group #{gIdx + 1}
                   </h2>
+                  {groups.length > 1 && (
+                    <button
+                      type="button"
+                      className="absolute top-2 right-2 text-red-500 px-2 py-1"
+                      onClick={() => removeGroup(gIdx)}
+                      title="Remove Group"
+                    >
+                      ✕
+                    </button>
+                  )}
 
                   {/* Mock Legal Representatives */}
                   {group.reps.map((rep, rIdx) => (
@@ -187,7 +210,7 @@ export default function PlaintiffDetailsPage() {
 
                   {/* Plaintiffs */}
                   {group.plaintiffs.map((p, pIdx) => (
-                    <div key={pIdx} className="space-y-2">
+                    <div key={pIdx} className="space-y-2 flex items-center gap-2">
                       <input
                         type="text"
                         placeholder={`Plaintiff Name #${pIdx + 1}`}
@@ -195,6 +218,16 @@ export default function PlaintiffDetailsPage() {
                         onChange={e => updateField(gIdx, "plaintiffs", pIdx, "name", e.target.value)}
                         className="w-full px-4 py-2 border border-[#bfc6d1] text-[#16305B] rounded-md"
                       />
+                      {group.plaintiffs.length > 1 && (
+                        <button
+                          type="button"
+                          className="text-red-500 px-2 py-1"
+                          onClick={() => removePlaintiff(gIdx, pIdx)}
+                          title="Remove"
+                        >
+                          ✕
+                        </button>
+                      )}
                       {validationErrors[`plaintiffName-${gIdx}-${pIdx}`] && (
                         <p className="text-red-500 text-sm">
                           {validationErrors[`plaintiffName-${gIdx}-${pIdx}`]}

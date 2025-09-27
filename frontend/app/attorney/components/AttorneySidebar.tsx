@@ -208,7 +208,7 @@ export default function AttorneySidebar({ selectedSection, onSectionChange }: At
             <LogOut className="w-6 h-6" />
           </div>
           <span
-            className={`text-[16px] font-medium transition-all duration-500 ease-in-out ${
+            className={`text-[16px] text-gray-800 font-medium transition-all duration-500 ease-in-out ${
               collapsed
                 ? "opacity-0 translate-x-[-10px] w-0 overflow-hidden"
                 : "opacity-100 translate-x-0 ml-2"

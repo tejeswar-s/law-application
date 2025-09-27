@@ -111,7 +111,7 @@ export default function JurorLogin() {
           <span className="text-gray-600">Don&apos;t have an account?</span>
           <Link
             href="/signup/juror"
-            className="border border-gray-300 rounded px-3 py-1 hover:bg-gray-100"
+            className="border text-gray-600 border-gray-300 rounded px-3 py-1 hover:bg-gray-100"
           >
             Sign up
           </Link>
@@ -142,7 +142,7 @@ export default function JurorLogin() {
                   required
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-[#0A2342] outline-none"
+                  className="w-full border text-gray-800 border-gray-300 rounded px-3 py-2 focus:ring-2 focus:ring-[#0A2342] outline-none"
                   disabled={loading}
                 />
               </div>
@@ -162,7 +162,7 @@ export default function JurorLogin() {
                     required
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    className="w-full border border-gray-300 rounded px-3 py-2 pr-10 focus:ring-2 focus:ring-[#0A2342] outline-none"
+                    className="w-full text-gray-800 border border-gray-300 rounded px-3 py-2 pr-10 focus:ring-2 focus:ring-[#0A2342] outline-none"
                     disabled={loading}
                   />
                   <button

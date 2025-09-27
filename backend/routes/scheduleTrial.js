@@ -13,7 +13,8 @@ const config = {
     trustServerCertificate: false,
   },
 };
-router.get("/cases", async (req, res) => {
+router.get("/all-cases", async (req, res) => {
+  console.log("Fetching all cases");
   try {
     await sql.connect(config);
     const result = await sql.query("SELECT * FROM ScheduledTrials");

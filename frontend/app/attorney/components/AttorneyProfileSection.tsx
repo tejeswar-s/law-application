@@ -294,17 +294,17 @@ export default function AttorneyProfileSection() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">First Name</label>
+                  <label className="block text-sm text-gray-800 font-medium mb-1">First Name</label>
                   <input
                     name="firstName"
                     type="text"
                     value={editData.firstName}
                     onChange={handleEditChange}
-                    className="w-full border rounded px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border text-gray-800 rounded px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Last Name</label>
+                  <label className="block text-sm text-gray-800 font-medium mb-1">Last Name</label>
                   <input
                     name="lastName"
                     type="text"
@@ -314,7 +314,7 @@ export default function AttorneyProfileSection() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Email Address</label>
+                  <label className="block text-sm text-gray-800 font-medium mb-1">Email Address</label>
                   <input
                     name="email"
                     type="email"
@@ -324,7 +324,7 @@ export default function AttorneyProfileSection() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Phone Number</label>
+                  <label className="block text-sm text-gray-800 font-medium mb-1">Phone Number</label>
                   <input
                     name="phoneNumber"
                     type="text"
@@ -343,7 +343,7 @@ export default function AttorneyProfileSection() {
                   </button>
                   <button
                     onClick={() => setShowEdit(false)}
-                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
+                    className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition-colors"
                     disabled={updating}
                   >
                     Cancel

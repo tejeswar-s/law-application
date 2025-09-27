@@ -15,6 +15,7 @@ export default function AttorneyLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   // If a valid token cookie exists, redirect to attorney home
@@ -41,6 +42,7 @@ export default function AttorneyLogin() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setLoading(true);
 
     try {
       const res = await fetch(`${API_BASE}/api/auth/attorney/login`, {
@@ -51,6 +53,7 @@ export default function AttorneyLogin() {
       const data = await res.json();
       if (!res.ok) {
         setError(data.message || "Login failed");
+        setLoading(false);
         return;
       }
       if (data.token) {
@@ -64,6 +67,7 @@ export default function AttorneyLogin() {
       router.push("/attorney");
     } catch {
       setError("Network error");
+      setLoading(false);
     }
   };
 
@@ -110,7 +114,7 @@ export default function AttorneyLogin() {
           <span className="text-gray-600">Don&apos;t have an account?</span>
           <Link
             href="/signup/attorney"
-            className="border border-gray-300 rounded px-3 py-1 hover:bg-gray-100"
+            className="border text-gray-600 border-gray-300 rounded px-3 py-1 hover:bg-gray-100"
           >
             Sign Up
           </Link>
@@ -165,9 +169,10 @@ export default function AttorneyLogin() {
               <div>
                 <button
                   type="submit"
-                  className="w-full bg-[#0A2342] text-white rounded px-4 py-2 hover:bg-[#132c54] transition"
+                  className={`w-full bg-[#0A2342] text-white rounded px-4 py-2 hover:bg-[#132c54] transition ${loading ? "opacity-70 cursor-not-allowed" : ""}`}
+                  disabled={loading}
                 >
-                  Log in
+                  {loading ? "Logging in..." : "Log in"}
                 </button>
                 {error && (
                   <div className="mt-2 text-red-500 text-sm">{error}</div>

@@ -71,7 +71,7 @@ export default function HomeSection({ sidebarCollapsed }: { sidebarCollapsed: bo
     // Fetch attorney cases for job board
     const fetchJobs = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/cases`);
+        const res = await fetch(`${API_BASE}/api/all-cases`);
         const data = await res.json();
         const cases = Array.isArray(data) ? data : (Array.isArray(data.recordset) ? data.recordset : []);
         setJobs(cases.map((c: any) => ({

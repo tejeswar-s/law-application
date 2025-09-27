@@ -14,10 +14,14 @@ const config = {
     trustServerCertificate: false,
   },
 };
+// filepath: d:\CODING\dev-07\law-application\backend\routes\caseRoutes.js
+
 router.get("/cases", async (req, res) => {
-  // Example: get user from query param (for demo; use JWT/session in production)
   const userId = req.query.userId;
-  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
 
   await sql.connect(config);
   const result = await sql.query`
