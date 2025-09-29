@@ -1,0 +1,8 @@
+{
+    "appService.zipIgnorePattern": [
+        "node_modules{,/**}",
+        ".vscode{,/**}"
+    ],
+    "appService.defaultWebAppToDeploy": "/subscriptions/3d216d3a-bc5f-4215-b0dc-0cc535d76d21/resourceGroups/QuickVerdicts_Dev/providers/Microsoft.Web/sites/QuickVerdictsDev",
+    "appService.deploySubpath": "frontend"
+}
