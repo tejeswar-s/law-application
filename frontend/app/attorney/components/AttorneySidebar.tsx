@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
-
 import { useRouter } from "next/navigation";
 import LogoutOverlay from "../../juror/components/LogoutOverlay";
+import NotificationPreview from "@/app/components/NotificationPreview";
 import {
   User,
   Bell,
@@ -21,6 +21,10 @@ const ACTIVE_BG = "#F7F6F3";
 const ACTIVE_TEXT = "#16305B";
 const TEXT_COLOR = "white";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL 
+  ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, '')
+  : "http://localhost:4000";
+
 type Section = "home" | "profile" | "notifications" | "cases" | "calendar";
 
 interface AttorneySidebarProps {
@@ -28,10 +32,46 @@ interface AttorneySidebarProps {
   onSectionChange: (section: Section) => void;
 }
 
+function getCookie(name: string) {
+  if (typeof document === 'undefined') return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift();
+  return null;
+}
+
 export default function AttorneySidebar({ selectedSection, onSectionChange }: AttorneySidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [hoveredNotifications, setHoveredNotifications] = useState(false);
   const router = useRouter();
+
+  const fetchUnreadCount = async () => {
+    try {
+      const token = getCookie("token");
+      if (!token) return;
+      
+      const res = await fetch(`${API_BASE}/api/notifications/unread-count`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      
+      if (!res.ok) throw new Error('Failed to fetch');
+      
+      const data = await res.json();
+      if (data.success) {
+        setUnreadCount(data.count);
+      }
+    } catch (error) {
+      console.error("Failed to fetch unread count:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const navLinks = [
     { id: "profile", label: "Profile", icon: <User className="w-6 h-6" /> },
@@ -78,25 +118,11 @@ export default function AttorneySidebar({ selectedSection, onSectionChange }: At
       </div>
 
       {/* Logo */}
-      <div
-        className={`mt-14 flex items-center justify-center transition-all duration-500 ease-in-out`}
-      >
+      <div className={`mt-14 flex items-center justify-center transition-all duration-500 ease-in-out`}>
         {collapsed ? (
-          <Image
-            src="/mini_logo.png"
-            alt="QV Mini"
-            width={40}
-            height={40}
-            className="h-12 w-auto"
-          />
+          <Image src="/mini_logo.png" alt="QV Mini" width={40} height={40} className="h-12 w-auto" />
         ) : (
-          <Image
-            src="/logo_sidebar_signup.png"
-            alt="Quick Verdicts"
-            width={200}
-            height={64}
-            className="h-16 w-auto"
-          />
+          <Image src="/logo_sidebar_signup.png" alt="Quick Verdicts" width={200} height={64} className="h-16 w-auto" />
         )}
       </div>
 
@@ -105,36 +131,46 @@ export default function AttorneySidebar({ selectedSection, onSectionChange }: At
         <nav className={`flex flex-col ${collapsed ? "items-center" : ""}`}>
           {navLinks.map((n) => {
             const active = selectedSection === n.id;
+            const isNotifications = n.id === "notifications";
             return (
-              <button
-                key={n.id}
-                type="button"
-                onClick={() => onSectionChange(n.id as Section)}
-                className={`flex items-center rounded transition-all duration-500 ease-in-out cursor-pointer ${
-                  collapsed ? "justify-center py-3" : "px-4 py-3 gap-3"
-                } ${active ? "hover:bg-opacity-90" : "hover:bg-white/10"}`}
-                style={{
-                  backgroundColor: active ? ACTIVE_BG : "transparent",
-                }}
-                aria-current={active ? "page" : undefined}
+              <div 
+                key={n.id} 
+                className="relative"
+                onMouseEnter={() => isNotifications && setHoveredNotifications(true)}
+                onMouseLeave={() => isNotifications && setHoveredNotifications(false)}
               >
-                <div
-                  className="flex items-center justify-center w-10 h-10"
-                  style={{ color: active ? ACTIVE_TEXT : TEXT_COLOR }}
+                <button
+                  type="button"
+                  onClick={() => onSectionChange(n.id as Section)}
+                  className={`flex items-center rounded transition-all duration-500 ease-in-out cursor-pointer w-full ${
+                    collapsed ? "justify-center py-3" : "px-4 py-3 gap-3"
+                  } ${active ? "hover:bg-opacity-90" : "hover:bg-white/10"}`}
+                  style={{ backgroundColor: active ? ACTIVE_BG : "transparent" }}
                 >
-                  {n.icon}
-                </div>
-                <span
-                  className={`text-[16px] font-semibold whitespace-nowrap transition-all duration-500 ease-in-out ${
-                    collapsed
-                      ? "opacity-0 translate-x-[-10px] w-0 overflow-hidden"
-                      : "opacity-100 translate-x-0 ml-2"
-                  }`}
-                  style={{ color: active ? ACTIVE_TEXT : TEXT_COLOR }}
-                >
-                  {n.label}
-                </span>
-              </button>
+                  <div
+                    className="flex items-center justify-center w-10 h-10 relative"
+                    style={{ color: active ? ACTIVE_TEXT : TEXT_COLOR }}
+                  >
+                    {n.icon}
+                    {isNotifications && unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className={`text-[16px] font-semibold whitespace-nowrap transition-all duration-500 ease-in-out ${
+                      collapsed ? "opacity-0 translate-x-[-10px] w-0 overflow-hidden" : "opacity-100 translate-x-0 ml-2"
+                    }`}
+                    style={{ color: active ? ACTIVE_TEXT : TEXT_COLOR }}
+                  >
+                    {n.label}
+                  </span>
+                </button>
+                {isNotifications && !collapsed && (
+                  <NotificationPreview isHovered={hoveredNotifications} />
+                )}
+              </div>
             );
           })}
         </nav>
@@ -142,14 +178,6 @@ export default function AttorneySidebar({ selectedSection, onSectionChange }: At
 
       {/* Divider */}
       <div className="mt-6 border-t border-white/20" />
-
-      {/* Section Label */}
-      <div
-        className={`mt-4 px-6 transition-all duration-500 ease-in-out ${
-          collapsed ? "opacity-0 h-0 overflow-hidden" : "opacity-100 h-auto"
-        }`}
-      >
-      </div>
 
       {/* Main nav */}
       <nav className="flex flex-col mt-2">
@@ -163,22 +191,14 @@ export default function AttorneySidebar({ selectedSection, onSectionChange }: At
               className={`flex items-center rounded transition-all duration-500 ease-in-out cursor-pointer mx-2 ${
                 collapsed ? "justify-center py-3" : "px-4 py-3 gap-3"
               } ${active ? "hover:bg-opacity-90" : "hover:bg-white/10"}`}
-              style={{
-                backgroundColor: active ? ACTIVE_BG : "transparent",
-              }}
-              aria-current={active ? "page" : undefined}
+              style={{ backgroundColor: active ? ACTIVE_BG : "transparent" }}
             >
-              <div
-                className="flex items-center justify-center w-10 h-10"
-                style={{ color: active ? ACTIVE_TEXT : TEXT_COLOR }}
-              >
+              <div className="flex items-center justify-center w-10 h-10" style={{ color: active ? ACTIVE_TEXT : TEXT_COLOR }}>
                 {m.icon}
               </div>
               <span
                 className={`text-[16px] font-semibold whitespace-nowrap transition-all duration-500 ease-in-out ${
-                  collapsed
-                    ? "opacity-0 translate-x-[-10px] w-0 overflow-hidden"
-                    : "opacity-100 translate-x-0 ml-2"
+                  collapsed ? "opacity-0 translate-x-[-10px] w-0 overflow-hidden" : "opacity-100 translate-x-0 ml-2"
                 }`}
                 style={{ color: active ? ACTIVE_TEXT : TEXT_COLOR }}
               >
@@ -189,7 +209,6 @@ export default function AttorneySidebar({ selectedSection, onSectionChange }: At
         })}
       </nav>
 
-      {/* Spacer */}
       <div className="flex-1" />
 
       {/* Sign out */}
@@ -201,17 +220,12 @@ export default function AttorneySidebar({ selectedSection, onSectionChange }: At
             collapsed ? "justify-center py-3" : "px-4 py-3 w-full gap-3"
           } rounded hover:bg-white/10 transition-colors duration-300`}
         >
-          <div
-            className="flex items-center justify-center w-10 h-10"
-            style={{ color: TEXT_COLOR }}
-          >
+          <div className="flex items-center justify-center w-10 h-10" style={{ color: TEXT_COLOR }}>
             <LogOut className="w-6 h-6" />
           </div>
           <span
             className={`text-[16px] text-gray-800 font-medium transition-all duration-500 ease-in-out ${
-              collapsed
-                ? "opacity-0 translate-x-[-10px] w-0 overflow-hidden"
-                : "opacity-100 translate-x-0 ml-2"
+              collapsed ? "opacity-0 translate-x-[-10px] w-0 overflow-hidden" : "opacity-100 translate-x-0 ml-2"
             }`}
             style={{ color: TEXT_COLOR }}
           >
@@ -222,7 +236,6 @@ export default function AttorneySidebar({ selectedSection, onSectionChange }: At
           open={showLogout}
           onClose={() => setShowLogout(false)}
           onSignOut={() => {
-            // Remove token cookie
             document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             setShowLogout(false);
             window.location.href = "/login/attorney";

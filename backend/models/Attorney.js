@@ -365,6 +365,26 @@ async function deleteAttorney(attorneyId) {
   }
 }
 
+/**
+ * Deactivate attorney account (used when declining)
+ * @param {number} attorneyId - Attorney ID
+ */
+async function deactivateAttorney(attorneyId) {
+  try {
+    const pool = await poolPromise;
+    await pool.request().input("attorneyId", attorneyId).query(`
+      UPDATE dbo.Attorneys 
+      SET IsVerified = 0,
+          VerificationStatus = 'declined',
+          UpdatedAt = GETUTCDATE()
+      WHERE AttorneyId = @attorneyId
+    `);
+  } catch (error) {
+    console.error("Error deactivating attorney:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   findByEmail,
   findById,
@@ -376,4 +396,5 @@ module.exports = {
   updatePassword,
   updateProfile,
   deleteAttorney,
+  deactivateAttorney,
 };

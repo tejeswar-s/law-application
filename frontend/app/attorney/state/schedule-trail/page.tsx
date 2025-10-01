@@ -140,38 +140,61 @@ export default function ScheduleTrialPage() {
   };
 
   const handleComplete = async () => {
-    setRedirecting(true); // Show animation
-    const user = JSON.parse(localStorage.getItem("attorneyUser") || "{}");
+  setRedirecting(true);
 
-    const caseDetails = {
-      county: localStorage.getItem("county"),
-      caseType: localStorage.getItem("caseType"),
-      caseTier: localStorage.getItem("caseTier"),
-      caseDescription: localStorage.getItem("caseDescription"),
-      paymentMethod: localStorage.getItem("paymentMethod"),
-      paymentAmount: localStorage.getItem("paymentAmount"),
-      plaintiffGroups: JSON.parse(localStorage.getItem("plaintiffGroups") || "[]"),
-      defendantGroups: JSON.parse(localStorage.getItem("defendantGroups") || "[]"),
-      scheduledDate: selectedDate ? formatDateString(selectedDate) : '',
-      scheduledTime: selectedTime + ":00",
-      name,
-      email,
-    };
+  // Read voir dire Part 2 questions from localStorage
+  const voirDire2Questions = JSON.parse(localStorage.getItem("voirDire2Questions") || "[]");
 
-    await fetch(`${API_BASE}/api/schedule-trial`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...caseDetails,
-        UserId: user.email,
-      }),
-    });
-
-    // Show animation for 1.8s before redirecting
-    setTimeout(() => {
-      router.push("/attorney");
-    }, 1800);
+  const caseDetails = {
+    county: localStorage.getItem("county"),
+    caseType: localStorage.getItem("caseTypeSelection"),
+    caseTier: localStorage.getItem("caseTier"),
+    civilOrCriminal: localStorage.getItem("caseType"),
+    caseDescription: localStorage.getItem("caseDescription"),
+    paymentMethod: localStorage.getItem("paymentMethod"),
+    paymentAmount: localStorage.getItem("paymentAmount"),
+    plaintiffGroups: JSON.parse(localStorage.getItem("plaintiffGroups") || "[]"),
+    defendantGroups: JSON.parse(localStorage.getItem("defendantGroups") || "[]"),
+    scheduledDate: selectedDate ? formatDateString(selectedDate) : '',
+    scheduledTime: selectedTime + ":00",
+    name,
+    email,
   };
+
+  const token = getCookie("token");
+
+  const response = await fetch(`${API_BASE}/api/cases`, {
+    method: "POST",
+    headers: { 
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`
+    },
+    body: JSON.stringify({
+      caseType: caseDetails.caseType,
+      caseTier: caseDetails.caseTier,
+      county: caseDetails.county,
+      caseTitle: "Case Title",
+      caseDescription: caseDetails.caseDescription,
+      paymentMethod: caseDetails.paymentMethod,
+      paymentAmount: caseDetails.paymentAmount,
+      scheduledDate: caseDetails.scheduledDate,
+      scheduledTime: caseDetails.scheduledTime,
+      plaintiffGroups: caseDetails.plaintiffGroups,
+      defendantGroups: caseDetails.defendantGroups,
+      voirDire2Questions: voirDire2Questions, // Now reads from localStorage
+    }),
+  });
+
+  if (!response.ok) {
+    alert("Failed to create case");
+    setRedirecting(false);
+    return;
+  }
+
+  setTimeout(() => {
+    router.push("/attorney");
+  }, 1800);
+};
 
   // Helper to get end time (adds 2.5 hours to start time)
   function getEndTime(start: string) {
@@ -183,6 +206,14 @@ export default function ScheduleTrialPage() {
       endM -= 60;
     }
     return `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
+  }
+
+  // Add this helper function after imports
+  function getCookie(name: string) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(';').shift();
+    return null;
   }
 
   return (

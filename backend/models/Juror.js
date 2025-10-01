@@ -1,20 +1,26 @@
 /**
- * Set juror as qualified in quiz
+ * Update onboarding completion status
+ * Automatically sets OnboardingCompleted = 1 when both video and quiz are completed
  * @param {number} jurorId - Juror ID
  */
-async function setQualifiedInQuiz(jurorId) {
+async function updateOnboardingStatus(jurorId) {
   try {
     const pool = await poolPromise;
     await pool.request().input("jurorId", jurorId).query(`
       UPDATE dbo.Jurors
-      SET isQualifiedInQuiz = 1, UpdatedAt = GETUTCDATE()
+      SET OnboardingCompleted = CASE 
+        WHEN IntroVideoCompleted = 1 AND JurorQuizCompleted = 1 THEN 1 
+        ELSE 0 
+      END,
+      UpdatedAt = GETUTCDATE()
       WHERE JurorId = @jurorId
     `);
   } catch (error) {
-    console.error("Error setting isQualifiedInQuiz:", error);
+    console.error("Error updating onboarding status:", error);
     throw error;
   }
 }
+
 /**
  * Update juror profile
  * @param {number} jurorId - Juror ID
@@ -86,8 +92,7 @@ async function findByEmail(email) {
           OnboardingCompleted,
           CreatedAt,
           UpdatedAt,
-          LastLoginAt,
-          ISNULL(isQualifiedInQuiz, 0) as isQualifiedInQuiz
+          LastLoginAt
         FROM dbo.Jurors 
         WHERE Email = @email
       `);
@@ -139,8 +144,7 @@ async function findById(jurorId) {
           OnboardingCompleted,
           CreatedAt,
           UpdatedAt,
-          LastLoginAt,
-          ISNULL(isQualifiedInQuiz, 0) as isQualifiedInQuiz
+          LastLoginAt
         FROM dbo.Jurors 
         WHERE JurorId = @jurorId
       `);
@@ -211,7 +215,6 @@ async function createJuror(data) {
           IntroVideoCompleted,
           JurorQuizCompleted,
           OnboardingCompleted,
-          isQualifiedInQuiz,
           CreatedAt,
           UpdatedAt
         ) VALUES (
@@ -240,7 +243,6 @@ async function createJuror(data) {
           0,
           'pending',
           1,
-          0,
           0,
           0,
           0,
@@ -487,5 +489,5 @@ module.exports = {
   deactivateJuror,
   updatePassword,
   updateJurorProfile,
-  setQualifiedInQuiz,
+  updateOnboardingStatus,
 };

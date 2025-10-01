@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import LogoutOverlay from "./LogoutOverlay";
+import NotificationPreview from "@/app/components/NotificationPreview";
 import {
   User,
   Bell,
@@ -21,6 +21,10 @@ const ACTIVE_BG = "#D4C397";
 const ACTIVE_TEXT = "#0C2D57";
 const TEXT_COLOR = "#D4C397";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL 
+  ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, '')
+  : "http://localhost:4000";
+
 type Section = "home" | "profile" | "notifications" | "assigned" | "jobs";
 
 interface JurorSidebarProps {
@@ -29,10 +33,46 @@ interface JurorSidebarProps {
   onCollapsedChange?: (collapsed: boolean) => void;
 }
 
+function getCookie(name: string) {
+  if (typeof document === 'undefined') return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift();
+  return null;
+}
+
 export default function JurorSidebar({ selectedSection, onSectionChange, onCollapsedChange }: JurorSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [hoveredNotifications, setHoveredNotifications] = useState(false);
   const router = useRouter();
+
+  const fetchUnreadCount = async () => {
+    try {
+      const token = getCookie("token");
+      if (!token) return;
+      
+      const res = await fetch(`${API_BASE}/api/notifications/unread-count`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      
+      if (!res.ok) throw new Error('Failed to fetch');
+      
+      const data = await res.json();
+      if (data.success) {
+        setUnreadCount(data.count);
+      }
+    } catch (error) {
+      console.error("Failed to fetch unread count:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const navLinks = [
     { id: "profile", label: "Profile", icon: <User className="w-6 h-6" /> },
@@ -52,7 +92,6 @@ export default function JurorSidebar({ selectedSection, onSectionChange, onColla
       }`}
       style={{ backgroundColor: NAV_BG }}
     >
-      {/* Collapse Button */}
       <div
         className={`absolute ${
           collapsed ? "left-1/2 -translate-x-1/2" : "right-2"
@@ -65,7 +104,6 @@ export default function JurorSidebar({ selectedSection, onSectionChange, onColla
             onCollapsedChange?.(newCollapsed);
           }}
           title={collapsed ? "Expand" : "Collapse"}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           className="flex items-center justify-center w-9 h-9 bg-transparent rounded hover:bg-white/10 transition-colors duration-300 cursor-pointer"
         >
           {collapsed ? (
@@ -82,71 +120,65 @@ export default function JurorSidebar({ selectedSection, onSectionChange, onColla
         </button>
       </div>
 
-      {/* Logo */}
-      <div
-        className={`mt-14 flex items-center justify-center transition-all duration-500 ease-in-out`}
-      >
+      <div className={`mt-14 flex items-center justify-center transition-all duration-500 ease-in-out`}>
         {collapsed ? (
-          <Image
-            src="/mini_logo.png"
-            alt="QV Mini"
-            width={40}
-            height={40}
-            className="h-12 w-auto"
-          />
+          <Image src="/mini_logo.png" alt="QV Mini" width={40} height={40} className="h-12 w-auto" />
         ) : (
-          <Image
-            src="/logo_sidebar_signup.png"
-            alt="Quick Verdicts"
-            width={200}
-            height={64}
-            className="h-16 w-auto"
-          />
+          <Image src="/logo_sidebar_signup.png" alt="Quick Verdicts" width={200} height={64} className="h-16 w-auto" />
         )}
       </div>
 
-      {/* Top nav (Profile / Notifications) */}
       <div className={`mt-10 ${collapsed ? "space-y-2" : "space-y-4"} px-1`}>
         <nav className={`flex flex-col ${collapsed ? "items-center" : ""}`}>
           {navLinks.map((n) => {
             const active = selectedSection === n.id;
+            const isNotifications = n.id === "notifications";
             return (
-              <button
-                key={n.id}
-                type="button"
-                onClick={() => onSectionChange(n.id as Section)}
-                className={`flex items-center w-full cursor-pointer ${
-                  collapsed ? "justify-center py-3" : "px-6 py-3"
-                } hover:bg-white/10 rounded transition-all duration-300 ${active ? "bg-[#D4C397]" : ""}`}
-                style={{ backgroundColor: active ? ACTIVE_BG : undefined }}
-                aria-current={active ? "page" : undefined}
+              <div 
+                key={n.id} 
+                className="relative"
+                onMouseEnter={() => isNotifications && setHoveredNotifications(true)}
+                onMouseLeave={() => isNotifications && setHoveredNotifications(false)}
               >
-                <div
-                  className="flex items-center justify-center w-10 h-10"
-                  style={{ color: active ? ACTIVE_TEXT : TEXT_COLOR }}
+                <button
+                  type="button"
+                  onClick={() => onSectionChange(n.id as Section)}
+                  className={`flex items-center w-full cursor-pointer ${
+                    collapsed ? "justify-center py-3" : "px-6 py-3"
+                  } hover:bg-white/10 rounded transition-all duration-300 ${active ? "bg-[#D4C397]" : ""}`}
+                  style={{ backgroundColor: active ? ACTIVE_BG : undefined }}
                 >
-                  {n.icon}
-                </div>
-                <span
-                  className={`text-[16px] font-medium whitespace-nowrap transition-all duration-500 ease-in-out ${
-                    collapsed
-                      ? "opacity-0 translate-x-[-10px] w-0 overflow-hidden"
-                      : "opacity-100 translate-x-0 ml-2"
-                  }`}
-                  style={{ color: active ? ACTIVE_TEXT : TEXT_COLOR }}
-                >
-                  {n.label}
-                </span>
-              </button>
+                  <div
+                    className="flex items-center justify-center w-10 h-10 relative"
+                    style={{ color: active ? ACTIVE_TEXT : TEXT_COLOR }}
+                  >
+                    {n.icon}
+                    {isNotifications && unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className={`text-[16px] font-medium whitespace-nowrap transition-all duration-500 ease-in-out ${
+                      collapsed ? "opacity-0 translate-x-[-10px] w-0 overflow-hidden" : "opacity-100 translate-x-0 ml-2"
+                    }`}
+                    style={{ color: active ? ACTIVE_TEXT : TEXT_COLOR }}
+                  >
+                    {n.label}
+                  </span>
+                </button>
+                {isNotifications && !collapsed && (
+                  <NotificationPreview isHovered={hoveredNotifications} />
+                )}
+              </div>
             );
           })}
         </nav>
       </div>
 
-      {/* Divider */}
       <div className="mt-6 border-t border-white/20" />
 
-      {/* Main nav */}
       <nav className="flex flex-col mt-2 px-1">
         {mainNav.map((m) => {
           const active = selectedSection === m.id;
@@ -157,23 +189,15 @@ export default function JurorSidebar({ selectedSection, onSectionChange, onColla
               onClick={() => onSectionChange(m.id as Section)}
               className={`flex items-center w-full ${
                 collapsed ? "justify-center py-3" : "px-6 py-3"
-              } hover:bg-white/10 rounded transition-all duration-300 ${
-                active ? "bg-[#D4C397]" : ""
-              }`}
+              } hover:bg-white/10 rounded transition-all duration-300 ${active ? "bg-[#D4C397]" : ""}`}
               style={{ backgroundColor: active ? ACTIVE_BG : undefined }}
-              aria-current={active ? "page" : undefined}
             >
-              <div
-                className="flex items-center justify-center w-10 h-10"
-                style={{ color: active ? ACTIVE_TEXT : TEXT_COLOR }}
-              >
+              <div className="flex items-center justify-center w-10 h-10" style={{ color: active ? ACTIVE_TEXT : TEXT_COLOR }}>
                 {m.icon}
               </div>
               <span
                 className={`text-[16px] font-semibold whitespace-nowrap transition-all duration-500 ease-in-out ${
-                  collapsed
-                    ? "opacity-0 translate-x-[-10px] w-0 overflow-hidden"
-                    : "opacity-100 translate-x-0 ml-2"
+                  collapsed ? "opacity-0 translate-x-[-10px] w-0 overflow-hidden" : "opacity-100 translate-x-0 ml-2"
                 }`}
                 style={{ color: active ? ACTIVE_TEXT : TEXT_COLOR }}
               >
@@ -184,10 +208,8 @@ export default function JurorSidebar({ selectedSection, onSectionChange, onColla
         })}
       </nav>
 
-      {/* Spacer */}
       <div className="flex-1" />
 
-      {/* Sign out */}
       <div className="mb-6 px-4">
         <button
           type="button"
@@ -196,17 +218,12 @@ export default function JurorSidebar({ selectedSection, onSectionChange, onColla
             collapsed ? "justify-center py-3" : "px-4 py-3 w-full gap-3"
           } rounded hover:bg-white/10 transition-colors duration-300`}
         >
-          <div
-            className="flex items-center justify-center w-10 h-10"
-            style={{ color: TEXT_COLOR }}
-          >
+          <div className="flex items-center justify-center w-10 h-10" style={{ color: TEXT_COLOR }}>
             <LogOut className="w-6 h-6" />
           </div>
           <span
             className={`text-[16px] font-medium transition-all duration-500 ease-in-out ${
-              collapsed
-                ? "opacity-0 translate-x-[-10px] w-0 overflow-hidden"
-                : "opacity-100 translate-x-0 ml-2"
+              collapsed ? "opacity-0 translate-x-[-10px] w-0 overflow-hidden" : "opacity-100 translate-x-0 ml-2"
             }`}
             style={{ color: TEXT_COLOR }}
           >
@@ -217,7 +234,6 @@ export default function JurorSidebar({ selectedSection, onSectionChange, onColla
           open={showLogout}
           onClose={() => setShowLogout(false)}
           onSignOut={() => {
-            // Remove token cookie
             document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
             setShowLogout(false);
             router.push("/login/juror");

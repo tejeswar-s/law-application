@@ -349,6 +349,61 @@ async function getCasesLegacyFormat(attorneyId) {
   }
 }
 
+/**
+ * Get available cases for jurors based on location
+ * @param {string} jurorState - Juror's state
+ * @param {string} jurorCounty - Juror's county
+ * @returns {Array} Available cases
+ */
+async function getAvailableCasesForJuror(jurorState, jurorCounty) {
+  try {
+    const pool = await poolPromise;
+    const result = await pool
+      .request()
+      .input("jurorState", jurorState)
+      .input("jurorCounty", jurorCounty).query(`
+        SELECT 
+          c.CaseId,
+          c.CaseTitle,
+          c.CaseDescription,
+          c.CaseType,
+          c.CaseTier,
+          c.County,
+          c.ScheduledDate,
+          c.ScheduledTime,
+          c.PaymentAmount,
+          c.RequiredJurors,
+          c.PlaintiffGroups,
+          c.DefendantGroups,
+          c.VoirDire1Questions,
+          c.VoirDire2Questions,
+          a.LawFirmName,
+          a.FirstName + ' ' + a.LastName as AttorneyName,
+          (SELECT COUNT(*) FROM dbo.JurorApplications ja 
+           WHERE ja.CaseId = c.CaseId AND ja.Status = 'approved') as ApprovedJurors
+        FROM dbo.Cases c
+        INNER JOIN dbo.Attorneys a ON c.AttorneyId = a.AttorneyId
+        WHERE c.AttorneyStatus = '${ATTORNEY_CASE_STATES.WAR_ROOM}'
+          AND c.AdminApprovalStatus = 'approved'
+          AND (
+            -- Federal cases: available to all
+            (c.CaseType = 'federal')
+            OR
+            -- State cases: must match both state and county
+            (c.CaseType = 'state' AND c.County = @jurorCounty AND a.State = @jurorState)
+          )
+          AND (SELECT COUNT(*) FROM dbo.JurorApplications ja 
+               WHERE ja.CaseId = c.CaseId AND ja.Status = 'approved') < c.RequiredJurors
+        ORDER BY c.ScheduledDate ASC
+      `);
+
+    return result.recordset;
+  } catch (error) {
+    console.error("Error getting available cases for juror:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   ATTORNEY_CASE_STATES,
   JUROR_CASE_STATES,
@@ -356,6 +411,7 @@ module.exports = {
   createCase,
   getCasesByAttorney,
   getAvailableCasesForJurors,
+  getAvailableCasesForJuror,
   updateCaseStatus,
   getCasesPendingAdminApproval,
   validateCaseStateTransition,

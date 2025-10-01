@@ -36,7 +36,7 @@ async function reviewCaseApproval(req, res) {
   try {
     const { caseId } = req.params;
     const { decision, comments, rescheduleDate, rescheduleTime } = req.body;
-    const adminId = req.user.id;
+    const adminId = req.user?.id || 1; // Default to 1 if no admin auth
 
     // Validate decision
     if (!["approved", "rejected"].includes(decision)) {
@@ -205,36 +205,72 @@ async function getAttorneysPendingVerification(req, res) {
 }
 
 /**
- * Verify attorney
+ * Verify or decline attorney
  */
 async function verifyAttorney(req, res) {
   try {
     const { attorneyId } = req.params;
     const { status = "verified", comments } = req.body;
 
-    await Attorney.updateVerificationStatus(attorneyId, status);
+    // Get attorney details before updating
+    const attorney = await Attorney.findById(attorneyId);
+    if (!attorney) {
+      return res.status(404).json({
+        success: false,
+        message: "Attorney not found",
+      });
+    }
 
-    // Notify attorney
-    await Notification.createNotification({
-      userId: parseInt(attorneyId),
-      userType: "attorney",
-      type:
-        status === "verified"
-          ? "verification_approved"
-          : "verification_rejected",
-      title: `Account ${status}`,
-      message:
-        status === "verified"
-          ? "Your attorney account has been verified. You can now access all platform features."
-          : `Your account verification was rejected. ${
-              comments || "Please contact support for more information."
-            }`,
-    });
+    if (status === "declined") {
+      // Deactivate the attorney account
+      await Attorney.deactivateAttorney(attorneyId);
 
-    res.json({
-      success: true,
-      message: `Attorney ${status} successfully`,
-    });
+      // Send decline email with reason
+      const { sendAccountDeclinedEmail } = require("../utils/email");
+      await sendAccountDeclinedEmail(
+        attorney.Email,
+        "attorney",
+        comments || "Your application did not meet our current requirements."
+      );
+
+      // Create notification
+      await Notification.createNotification({
+        userId: parseInt(attorneyId),
+        userType: "attorney",
+        type: "verification_rejected",
+        title: "Account Declined",
+        message: `Your attorney account has been declined. ${
+          comments ? "Reason: " + comments : ""
+        }`,
+      });
+
+      return res.json({
+        success: true,
+        message: "Attorney declined and notified successfully",
+      });
+    } else {
+      // Verify the attorney
+      await Attorney.updateVerificationStatus(attorneyId, status);
+
+      // Send verification success email
+      const { sendAccountVerifiedEmail } = require("../utils/email");
+      await sendAccountVerifiedEmail(attorney.Email, "attorney");
+
+      // Notify attorney of verification
+      await Notification.createNotification({
+        userId: parseInt(attorneyId),
+        userType: "attorney",
+        type: "verification_approved",
+        title: "Account Verified",
+        message:
+          "Your attorney account has been verified. You can now access all platform features.",
+      });
+
+      return res.json({
+        success: true,
+        message: "Attorney verified successfully",
+      });
+    }
   } catch (error) {
     console.error("Verify attorney error:", error);
     res.status(500).json({
@@ -266,36 +302,72 @@ async function getJurorsPendingVerification(req, res) {
 }
 
 /**
- * Verify juror
+ * Verify or decline juror
  */
 async function verifyJuror(req, res) {
   try {
     const { jurorId } = req.params;
     const { status = "verified", comments } = req.body;
 
-    await Juror.updateVerificationStatus(jurorId, status);
+    // Get juror details before updating
+    const juror = await Juror.findById(jurorId);
+    if (!juror) {
+      return res.status(404).json({
+        success: false,
+        message: "Juror not found",
+      });
+    }
 
-    // Notify juror
-    await Notification.createNotification({
-      userId: parseInt(jurorId),
-      userType: "juror",
-      type:
-        status === "verified"
-          ? "verification_approved"
-          : "verification_rejected",
-      title: `Account ${status}`,
-      message:
-        status === "verified"
-          ? "Your juror account has been verified. You can now apply to cases."
-          : `Your account verification was rejected. ${
-              comments || "Please contact support for more information."
-            }`,
-    });
+    if (status === "declined") {
+      // Deactivate the juror account
+      await Juror.deactivateJuror(jurorId);
 
-    res.json({
-      success: true,
-      message: `Juror ${status} successfully`,
-    });
+      // Send decline email with reason
+      const { sendAccountDeclinedEmail } = require("../utils/email");
+      await sendAccountDeclinedEmail(
+        juror.Email,
+        "juror",
+        comments || "Your application did not meet our current requirements."
+      );
+
+      // Create notification
+      await Notification.createNotification({
+        userId: parseInt(jurorId),
+        userType: "juror",
+        type: "verification_rejected",
+        title: "Account Declined",
+        message: `Your juror account has been declined. ${
+          comments ? "Reason: " + comments : ""
+        }`,
+      });
+
+      return res.json({
+        success: true,
+        message: "Juror declined and notified successfully",
+      });
+    } else {
+      // Verify the juror
+      await Juror.updateVerificationStatus(jurorId, status);
+
+      // Send verification success email
+      const { sendAccountVerifiedEmail } = require("../utils/email");
+      await sendAccountVerifiedEmail(juror.Email, "juror");
+
+      // Notify juror of verification
+      await Notification.createNotification({
+        userId: parseInt(jurorId),
+        userType: "juror",
+        type: "verification_approved",
+        title: "Account Verified",
+        message:
+          "Your juror account has been verified. You can now apply to cases.",
+      });
+
+      return res.json({
+        success: true,
+        message: "Juror verified successfully",
+      });
+    }
   } catch (error) {
     console.error("Verify juror error:", error);
     res.status(500).json({

@@ -14,7 +14,9 @@ const scheduleTrialRoutes = require("./routes/scheduleTrial");
 const warRoomTeamRoutes = require("./routes/warRoomTeamRoutes");
 const warRoomDocumentRoutes = require("./routes/warRoomDocumentRoutes");
 const warRoomVoirDireRoutes = require("./routes/warRoomVoirDireRoutes");
-const warRoomInfoRoutes = require("./routes/warRoomInfoRoutes"); // <-- Add this import
+const warRoomInfoRoutes = require("./routes/warRoomInfoRoutes");
+const fileRoutes = require("./routes/fileRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 const adminRoutes = require("./routes/admin");
 // Import middleware
 const errorHandler = require("./middleware/errorHandler");
@@ -95,12 +97,14 @@ app.get("/api/health", async (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/attorney", attorneyRoutes);
 app.use("/api/juror", jurorRoutes);
-app.use("/api", scheduleTrialRoutes);
 app.use("/api", require("./routes/caseRoutes"));
+app.use("/api", scheduleTrialRoutes);
 app.use("/api", warRoomTeamRoutes);
 app.use("/api", warRoomDocumentRoutes);
 app.use("/api", warRoomVoirDireRoutes);
-app.use("/api", warRoomInfoRoutes); // <-- Add this line after other app.use("/api", ...) routes
+app.use("/api", warRoomInfoRoutes);
+app.use("/api", fileRoutes);
+app.use("/api", notificationRoutes);
 app.use("/api/admin", adminRoutes);
 
 // Test route for database connection

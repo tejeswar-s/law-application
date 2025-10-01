@@ -36,7 +36,11 @@ export default function VoirDirePart2() {
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    localStorage.setItem("voirDireQuestions", JSON.stringify(questions));
+    
+    // Filter out empty questions before saving
+    const validQuestions = questions.filter(q => q.trim());
+    localStorage.setItem("voirDire2Questions", JSON.stringify(validQuestions));
+    
     router.push("/attorney/state/payment-details");
   };
 
@@ -64,6 +68,7 @@ export default function VoirDirePart2() {
           </div>
         </div>
       </aside>
+
       {/* Main Content */}
       <section className="flex-1 flex flex-col min-h-screen bg-[#faf8f3] px-0 md:px-0 mb-20">
         <div className="w-full max-w-6xl mx-auto px-20">
@@ -93,6 +98,7 @@ export default function VoirDirePart2() {
             })}
           </div>
         </div>
+
         <div className="flex-1 flex flex-col pl-28">
           <div className="w-full max-w-2xl">
             <h1 className="text-3xl font-bold text-[#16305B] mb-8 mt-2">
@@ -116,6 +122,7 @@ export default function VoirDirePart2() {
                   )}
                 </div>
               ))}
+              
               <button
                 type="button"
                 onClick={addQuestion}
@@ -123,6 +130,7 @@ export default function VoirDirePart2() {
               >
                 + Add Another Voir Dire Question
               </button>
+              
               <button
                 type="submit"
                 className="w-full bg-[#16305B] text-white font-semibold px-8 py-2 rounded-md hover:bg-[#0A2342] transition"

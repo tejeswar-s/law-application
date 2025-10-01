@@ -7,6 +7,18 @@ const JurorApplication = require("../models/JurorApplication");
 const Event = require("../models/Event");
 const Notification = require("../models/Notification");
 const Verdict = require("../models/Verdict");
+const { poolPromise } = require("../config/db");
+
+// Standard Part 1 questions (hardcoded for all cases)
+const VOIR_DIRE_PART_1 = [
+  "Do you know or recognize any of the parties involved in this case?",
+  "Have you or a close family member ever had a dispute similar to the one in this case?",
+  "Do you have any personal or financial interest in the outcome of this case?",
+  "Do you have any bias, either for or against one of the parties, that could affect your ability to decide this case fairly?",
+  "Is there any reason—personal, emotional, or otherwise—that would prevent you from being fair and impartial in this case?",
+  "Do you have any health, time, or other personal issues that would prevent you from fully attending and completing your role as a juror in this case?",
+  "Do you believe you can listen to all the evidence presented and base your decision solely on the facts and the law, regardless of personal feelings?",
+];
 
 /**
  * Create new case (Attorney submits case)
@@ -14,9 +26,18 @@ const Verdict = require("../models/Verdict");
 async function createCase(req, res) {
   try {
     const attorneyId = req.user.id;
+    const { voirDire2Questions, ...restOfBody } = req.body;
+
+    console.log("=== CREATE CASE DEBUG ===");
+    console.log("voirDire2Questions received:", voirDire2Questions);
+    console.log("Type:", typeof voirDire2Questions);
+    console.log("Is Array:", Array.isArray(voirDire2Questions));
+
     const caseData = {
-      ...req.body,
+      ...restOfBody,
       attorneyId,
+      voirDire1Questions: VOIR_DIRE_PART_1,
+      voirDire2Questions: [],
     };
 
     // Validate required fields
@@ -39,6 +60,38 @@ async function createCase(req, res) {
 
     // Create the case
     const caseId = await Case.createCase(caseData);
+    console.log("Case created with ID:", caseId);
+
+    // Insert Part 2 questions into WarRoomVoirDire table
+    if (
+      voirDire2Questions &&
+      Array.isArray(voirDire2Questions) &&
+      voirDire2Questions.length > 0
+    ) {
+      console.log(
+        "Inserting",
+        voirDire2Questions.length,
+        "questions into WarRoomVoirDire"
+      );
+      const pool = await poolPromise;
+      for (const question of voirDire2Questions) {
+        if (question && question.trim()) {
+          console.log("Inserting question:", question);
+          await pool
+            .request()
+            .input("caseId", caseId)
+            .input("question", question.trim())
+            .input("response", "")
+            .input("addedBy", attorneyId).query(`
+              INSERT INTO WarRoomVoirDire (CaseId, Question, Response, AddedBy, AddedAt)
+              VALUES (@caseId, @question, @response, @addedBy, GETUTCDATE())
+            `);
+        }
+      }
+      console.log("All questions inserted successfully");
+    } else {
+      console.log("No voir dire 2 questions to insert");
+    }
 
     // Create event for case creation
     await Event.createEvent({
@@ -61,12 +114,17 @@ async function createCase(req, res) {
     res.status(500).json({
       success: false,
       message: "Failed to create case",
+      error: error.message,
     });
   }
 }
 
+// ... rest of the file stays exactly the same ...
+// (All other functions: getAttorneyCases, getCaseDetails, transitionCaseState, etc. remain unchanged)
+
 /**
  * Get cases for attorney dashboard with filtering
+ * UPDATED: Transform data to match frontend expectations
  */
 async function getAttorneyCases(req, res) {
   try {
@@ -75,25 +133,20 @@ async function getAttorneyCases(req, res) {
 
     const cases = await Case.getCasesByAttorney(attorneyId, status);
 
-    // Group cases by status for dashboard
-    const casesByStatus = {
-      pending_admin_approval: [],
-      war_room: [],
-      join_trial: [],
-      view_details: [],
-    };
+    // Transform to match frontend expectations (flat array format)
+    const transformedCases = cases.map((c) => ({
+      Id: c.CaseId,
+      PlaintiffGroups: c.PlaintiffGroups,
+      DefendantGroups: c.DefendantGroups,
+      ScheduledDate: c.ScheduledDate,
+      ScheduledTime: c.ScheduledTime,
+      attorneyEmail: req.user.email,
+      CaseTitle: c.CaseTitle,
+      AttorneyStatus: c.AttorneyStatus,
+      AdminApprovalStatus: c.AdminApprovalStatus,
+    }));
 
-    cases.forEach((caseItem) => {
-      if (casesByStatus[caseItem.AttorneyStatus]) {
-        casesByStatus[caseItem.AttorneyStatus].push(caseItem);
-      }
-    });
-
-    res.json({
-      success: true,
-      cases: casesByStatus,
-      totalCases: cases.length,
-    });
+    res.json(transformedCases);
   } catch (error) {
     console.error("Get attorney cases error:", error);
     res.status(500).json({

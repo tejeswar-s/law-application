@@ -17,7 +17,7 @@ const createTransporter = async () => {
   } else {
     // Development: prefer Gmail if provided, otherwise use Ethereal test account
     if (process.env.EMAIL_USER && process.env.EMAIL_APP_PASSWORD) {
-      return nodemailer.createTransporter({
+      return nodemailer.createTransport({
         service: "gmail",
         auth: {
           user: process.env.EMAIL_USER,
@@ -26,7 +26,7 @@ const createTransporter = async () => {
       });
     }
     const testAccount = await nodemailer.createTestAccount();
-    return nodemailer.createTransporter({
+    return nodemailer.createTransport({
       host: "smtp.ethereal.email",
       port: 587,
       secure: false,
@@ -83,7 +83,6 @@ async function sendEmailVerification(email, verificationToken, userType) {
   try {
     const transporter = await createTransporter();
 
-    // Link to juror signup page with token so the app can jump to step 4
     const signupPath = userType === "attorney" ? "attorney" : "juror";
     const verificationLink = `${process.env.FRONTEND_URL}/signup/${signupPath}?verifyToken=${verificationToken}`;
 
@@ -139,9 +138,95 @@ async function testEmailConfig() {
   }
 }
 
+/**
+ * Send account declined notification email
+ */
+async function sendAccountDeclinedEmail(email, userType, reason) {
+  try {
+    const transporter = await createTransporter();
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: `Quick Verdicts - ${
+        userType.charAt(0).toUpperCase() + userType.slice(1)
+      } Account Status`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
+          <h2 style="color: #16305B; text-align: center;">Quick Verdicts</h2>
+          <p>Hello,</p>
+          <p>Thank you for your interest in joining Quick Verdicts as ${
+            userType === "attorney" ? "an" : "a"
+          } ${userType}.</p>
+          <p>After reviewing your application, we regret to inform you that we are unable to approve your account at this time.</p>
+          ${
+            reason
+              ? `<div style="background: #f5f5f5; padding: 15px; border-left: 4px solid #dc2626; margin: 20px 0;">
+                  <p style="margin: 0;"><strong>Reason:</strong></p>
+                  <p style="margin: 10px 0 0 0;">${reason}</p>
+                </div>`
+              : ""
+          }
+          <p>If you believe this was an error or have questions, please contact our support team.</p>
+          <p>Best regards,<br/>Quick Verdicts Team</p>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log("✅ Account declined email sent:", info.messageId);
+    return true;
+  } catch (error) {
+    console.error("❌ Error sending declined email:", error);
+    return false;
+  }
+}
+
+/**
+ * Send account verified notification email
+ */
+async function sendAccountVerifiedEmail(email, userType) {
+  try {
+    const transporter = await createTransporter();
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: `Quick Verdicts - ${
+        userType.charAt(0).toUpperCase() + userType.slice(1)
+      } Account Verified`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
+          <h2 style="color: #16305B; text-align: center;">Quick Verdicts</h2>
+          <p>Congratulations!</p>
+          <p>Your ${userType} account has been successfully verified by our admin team.</p>
+          <div style="background: #f0fdf4; padding: 15px; border-left: 4px solid #16a34a; margin: 20px 0;">
+            <p style="margin: 0; color: #16a34a;"><strong>✓ Account Status: Verified</strong></p>
+          </div>
+          <p>You now have full access to all platform features. You can log in and start using Quick Verdicts.</p>
+          <p style="text-align: center; margin: 30px 0;">
+            <a href="${process.env.FRONTEND_URL}/login" style="background:#16305B; color:#fff; padding:12px 30px; text-decoration:none; border-radius:5px; display:inline-block;">Login to Your Account</a>
+          </p>
+          <p>Thank you for joining Quick Verdicts!</p>
+          <p>Best regards,<br/>Quick Verdicts Team</p>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log("✅ Account verified email sent:", info.messageId);
+    return true;
+  } catch (error) {
+    console.error("❌ Error sending verified email:", error);
+    return false;
+  }
+}
+
 module.exports = {
   sendPasswordResetEmail,
   sendEmailVerification,
   createAndSendEmailVerification,
   testEmailConfig,
+  sendAccountDeclinedEmail,
+  sendAccountVerifiedEmail,
 };

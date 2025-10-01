@@ -2,26 +2,50 @@
 
 import Image from "next/image";
 import {
-  QuestionMarkCircleIcon, // Help
-  ArrowUpRightIcon,       // Apply
+  QuestionMarkCircleIcon,
+  ArrowUpRightIcon,
 } from "@heroicons/react/24/outline";
 import {
-  BanknotesIcon,          // Better Money Icon
-  TruckIcon,              // Car replacement
+  BanknotesIcon,
+  TruckIcon,
 } from "@heroicons/react/24/solid";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import VideoIntroOverlay from "./VideoIntroOverlay";
 import JurorQuizOverlay from "./JurorQuizOverlay";
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
-type Juror = {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
+const API_BASE = process.env.NEXT_PUBLIC_API_URL 
+  ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, '')
+  : "http://localhost:4000";
+
+function getCookie(name: string) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift();
+  return null;
+}
+
+function getCaseName(plaintiffGroups: string, defendantGroups: string) {
+  try {
+    const plaintiffs = JSON.parse(plaintiffGroups);
+    const defendants = JSON.parse(defendantGroups);
+    const plaintiffName = plaintiffs[0]?.plaintiffs?.[0]?.name || "Plaintiff";
+    const defendantName = defendants[0]?.defendants?.[0]?.name || "Defendant";
+    return `${plaintiffName} v. ${defendantName}`;
+  } catch {
+    return "Case";
+  }
+}
+
+type Application = {
+  ApplicationId: number;
+  CaseId: number;
+  Status: "pending" | "approved" | "rejected";
+  AppliedAt: string;
+  CaseTitle: string;
+  ScheduledDate: string;
+  PaymentAmount: number;
 };
-
 
 export default function HomeSection({ sidebarCollapsed }: { sidebarCollapsed: boolean }) {
   const [juror, setJuror] = useState<any>(null);
@@ -31,54 +55,73 @@ export default function HomeSection({ sidebarCollapsed }: { sidebarCollapsed: bo
   const [introVideoCompleted, setIntroVideoCompleted] = useState(false);
   const [showQuiz, setShowQuiz] = useState(false);
   const [quizCompleted, setQuizCompleted] = useState(false);
-  const [qualified, setQualified] = useState(false);
   const [jobs, setJobs] = useState<any[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
   const router = useRouter();
 
+  const fetchJurorProfile = async () => {
+    try {
+      const token = getCookie("token");
+      const res = await fetch(`${API_BASE}/api/juror/profile`, {
+        method: "GET",
+        headers: {
+          "Authorization": token ? `Bearer ${token}` : "",
+        },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setJuror(data.juror);
+        setIntroVideoCompleted(!!data.juror.IntroVideoCompleted);
+        setQuizCompleted(!!data.juror.JurorQuizCompleted);
+        return data.juror;
+      } else {
+        setError("Failed to fetch juror details");
+      }
+    } catch (err) {
+      setError("Failed to fetch juror details");
+    }
+    return null;
+  };
+
+  const fetchMyApplications = async () => {
+    try {
+      const token = getCookie("token");
+      const res = await fetch(`${API_BASE}/api/juror/applications`, {
+        headers: {
+          "Authorization": token ? `Bearer ${token}` : "",
+        },
+      });
+      const data = await res.json();
+      if (data.success) {
+        setApplications(data.applications || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch applications:", err);
+    }
+  };
+
   useEffect(() => {
-    const fetchJuror = async () => {
+    const init = async () => {
       setLoading(true);
       setError(null);
-      try {
-        let token = null;
-        if (typeof document !== "undefined") {
-          const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
-          token = match ? decodeURIComponent(match[1]) : null;
-        }
-        const res = await fetch(`${API_BASE}/api/juror/profile`, {
-          method: "GET",
-          headers: {
-            "Authorization": token ? `Bearer ${token}` : "",
-          },
-        });
-        const data = await res.json();
-        if (data.success) {
-          setJuror(data.juror);
-          setQualified(!!data.juror.isQualifiedInQuiz);
-        } else {
-          setError("Failed to fetch juror details");
-        }
-      } catch (err) {
-        setError("Failed to fetch juror details");
-      } finally {
-        setLoading(false);
-      }
+      await fetchJurorProfile();
+      await fetchMyApplications();
+      setLoading(false);
     };
-    fetchJuror();
+    init();
   }, []);
 
   useEffect(() => {
-    // Fetch attorney cases for job board
     const fetchJobs = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/all-cases`);
         const data = await res.json();
         const cases = Array.isArray(data) ? data : (Array.isArray(data.recordset) ? data.recordset : []);
-        setJobs(cases.map((c: any) => ({
+        setJobs(cases.slice(0, 4).map((c: any) => ({
           name: getCaseName(c.PlaintiffGroups, c.DefendantGroups),
           trialDate: c.ScheduledDate ? new Date(c.ScheduledDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "",
           trialTime: c.ScheduledTime,
-          price: c.JurorPay || c.jurorPay || c.PaymentAmount || 0, // Extract payment details
+          price: c.JurorPay || c.jurorPay || c.PaymentAmount || 0,
           id: c.Id,
         })));
       } catch (err) {
@@ -87,6 +130,40 @@ export default function HomeSection({ sidebarCollapsed }: { sidebarCollapsed: bo
     };
     fetchJobs();
   }, []);
+
+  const handleVideoNext = async () => {
+    try {
+      const token = getCookie("token");
+      await fetch(`${API_BASE}/api/juror/profile/task/intro_video`, {
+        method: "POST",
+        headers: {
+          "Authorization": token ? `Bearer ${token}` : "",
+        },
+      });
+      setShowIntroVideo(false);
+      setIntroVideoCompleted(true);
+      await fetchJurorProfile();
+    } catch (error) {
+      console.error("Failed to update video completion:", error);
+    }
+  };
+
+  const handleQuizFinish = async () => {
+    try {
+      const token = getCookie("token");
+      await fetch(`${API_BASE}/api/juror/profile/task/juror_quiz`, {
+        method: "POST",
+        headers: {
+          "Authorization": token ? `Bearer ${token}` : "",
+        },
+      });
+      setShowQuiz(false);
+      setQuizCompleted(true);
+      await fetchJurorProfile();
+    } catch (error) {
+      console.error("Failed to update quiz completion:", error);
+    }
+  };
 
   const tasks = [
     {
@@ -102,6 +179,10 @@ export default function HomeSection({ sidebarCollapsed }: { sidebarCollapsed: bo
       key: "quiz"
     },
   ];
+
+  const isFullyQualified = introVideoCompleted && quizCompleted;
+  const pendingCount = applications.filter(app => app.Status === "pending").length;
+  const approvedCount = applications.filter(app => app.Status === "approved").length;
 
   if (loading) {
     return (
@@ -119,32 +200,13 @@ export default function HomeSection({ sidebarCollapsed }: { sidebarCollapsed: bo
       <VideoIntroOverlay
         open={showIntroVideo}
         onClose={() => setShowIntroVideo(false)}
-        onNext={() => {
-          setShowIntroVideo(false);
-          setIntroVideoCompleted(true);
-        }}
+        onNext={handleVideoNext}
         sidebarCollapsed={sidebarCollapsed}
       />
       <JurorQuizOverlay
         open={showQuiz}
         onClose={() => setShowQuiz(false)}
-        onFinish={async () => {
-          setShowQuiz(false);
-          setQuizCompleted(true);
-          // Mark as qualified in backend
-          let token = null;
-          if (typeof document !== "undefined") {
-            const match = document.cookie.match(/(?:^|; )token=([^;]*)/);
-            token = match ? decodeURIComponent(match[1]) : null;
-          }
-          await fetch(`${API_BASE}/api/juror/profile/qualified`, {
-            method: "POST",
-            headers: {
-              "Authorization": token ? `Bearer ${token}` : "",
-            },
-          });
-          setQualified(true);
-        }}
+        onFinish={handleQuizFinish}
         sidebarCollapsed={sidebarCollapsed}
       />
       <div className="p-8 md:p-10 bg-[#FAF9F6] min-h-screen w-full">
@@ -164,8 +226,65 @@ export default function HomeSection({ sidebarCollapsed }: { sidebarCollapsed: bo
           </div>
         </div>
 
-        {/* My Tasks (only if not qualified) */}
-        {!qualified && (
+        {/* My Applications */}
+        {applications.length > 0 && (
+          <section className="mb-10">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-semibold text-[#0C2D57]">My Applications</h2>
+                <p className="text-sm text-gray-600">
+                  {approvedCount} approved, {pendingCount} pending review
+                </p>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+              <table className="w-full text-left">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="py-3 px-4 font-semibold text-[#0C2D57] text-sm">Case</th>
+                    <th className="py-3 px-4 font-semibold text-[#0C2D57] text-sm">Trial Date</th>
+                    <th className="py-3 px-4 font-semibold text-[#0C2D57] text-sm">Compensation</th>
+                    <th className="py-3 px-4 font-semibold text-[#0C2D57] text-sm">Status</th>
+                    <th className="py-3 px-4 font-semibold text-[#0C2D57] text-sm">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {applications.map((app) => (
+                    <tr key={app.ApplicationId} className="border-t">
+                      <td className="py-3 px-4 text-[#0C2D57]">{app.CaseTitle}</td>
+                      <td className="py-3 px-4 text-gray-600">
+                        {new Date(app.ScheduledDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                      </td>
+                      <td className="py-3 px-4 text-green-600 font-semibold">${app.PaymentAmount}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-3 py-1 rounded text-xs font-semibold ${
+                          app.Status === "approved" ? "bg-green-100 text-green-700" :
+                          app.Status === "rejected" ? "bg-red-100 text-red-700" :
+                          "bg-yellow-100 text-yellow-700"
+                        }`}>
+                          {app.Status.charAt(0).toUpperCase() + app.Status.slice(1)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        {app.Status === "approved" && (
+                          <button
+                            className="text-[#0C2D57] underline text-sm font-medium"
+                            onClick={() => router.push(`/juror/war-room/${app.CaseId}`)}
+                          >
+                            View War Room
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {/* My Tasks (only if not fully qualified) */}
+        {!isFullyQualified && (
           <section className="mb-10">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -179,7 +298,6 @@ export default function HomeSection({ sidebarCollapsed }: { sidebarCollapsed: bo
                   key={i}
                   className="relative rounded-md bg-white shadow-sm overflow-hidden group"
                 >
-                  {/* Image with white spacing */}
                   <div className="p-4">
                     <div className="relative w-full h-40 rounded-md overflow-hidden">
                       <Image
@@ -190,27 +308,25 @@ export default function HomeSection({ sidebarCollapsed }: { sidebarCollapsed: bo
                       />
                     </div>
                   </div>
-                  {/* Content */}
                   <div className="px-4 pb-10">
                     <h3 className="font-medium text-[15px] text-[#0C2D57] leading-snug">
                       {t.title}
                     </h3>
                     <p className="text-xs text-gray-500 mt-2">{t.duration}</p>
                   </div>
-                  {/* Radio bottom-right */}
                   <div className="absolute right-4 bottom-4">
                     {t.key === "intro-video" ? (
                       <button
-                        className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors shadow-md text-white text-lg font-bold ${showIntroVideo || introVideoCompleted ? 'border-[#0C2D57] bg-[#0C2D57]' : 'border-gray-300 bg-white hover:border-[#0C2D57]'}`}
+                        className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors shadow-md text-white text-lg font-bold ${introVideoCompleted ? 'border-[#0C2D57] bg-[#0C2D57]' : 'border-gray-300 bg-white hover:border-[#0C2D57]'}`}
                         aria-label="Start Introduction Video"
-                        onClick={() => setShowIntroVideo(true)}
+                        onClick={() => !introVideoCompleted && setShowIntroVideo(true)}
                         disabled={introVideoCompleted}
                       >
                         <span className="block w-3 h-3 rounded-full bg-white" />
                       </button>
                     ) : t.key === "quiz" ? (
                       <button
-                        className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors shadow-md text-white text-lg font-bold ${showQuiz || quizCompleted ? 'border-[#0C2D57] bg-[#0C2D57]' : introVideoCompleted ? 'border-gray-300 bg-white hover:border-[#0C2D57]' : 'border-gray-200 bg-gray-100 cursor-not-allowed'}`}
+                        className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-colors shadow-md text-white text-lg font-bold ${quizCompleted ? 'border-[#0C2D57] bg-[#0C2D57]' : introVideoCompleted ? 'border-gray-300 bg-white hover:border-[#0C2D57]' : 'border-gray-200 bg-gray-100 cursor-not-allowed'}`}
                         aria-label="Start Juror Quiz"
                         onClick={() => introVideoCompleted && !quizCompleted && setShowQuiz(true)}
                         disabled={!introVideoCompleted || quizCompleted}
@@ -227,11 +343,15 @@ export default function HomeSection({ sidebarCollapsed }: { sidebarCollapsed: bo
           </section>
         )}
 
-        {/* Job Board (always show) */}
+        {/* Job Board Preview */}
         <section>
           <div className="mb-4">
-            <h2 className="text-xl font-semibold text-[#0C2D57]">Job Board</h2>
-            <p className="text-sm text-gray-600">Apply to available trial postings</p>
+            <h2 className="text-xl font-semibold text-[#0C2D57]">Job Board Preview</h2>
+            <p className="text-sm text-gray-600">
+              {isFullyQualified 
+                ? "Apply to available trial postings" 
+                : "Complete onboarding to access full job board"}
+            </p>
           </div>
           {jobs.length === 0 ? (
             <div className="text-center text-gray-500 py-12">
@@ -251,11 +371,12 @@ export default function HomeSection({ sidebarCollapsed }: { sidebarCollapsed: bo
                       <p className="text-xs text-gray-500">Time: {job.trialTime}</p>
                     </div>
                   </div>
-                  {/* Footer: Apply + Money */}
                   <div className="mt-4 flex items-center justify-between">
                     <button
-                      className="flex items-center justify-center gap-1 w-1/2 py-2 border rounded text-sm text-gray-700 hover:bg-gray-50"
+                      className="flex items-center justify-center gap-1 w-1/2 py-2 border rounded text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                       title="Apply"
+                      disabled={!isFullyQualified}
+                      onClick={() => router.push(`/juror/apply/${job.id}`)}
                     >
                       <ArrowUpRightIcon className="w-4 h-4 text-gray-600" />
                       Apply
@@ -273,16 +394,4 @@ export default function HomeSection({ sidebarCollapsed }: { sidebarCollapsed: bo
       </div>
     </main>
   );
-}
-
-function getCaseName(plaintiffGroups: string, defendantGroups: string) {
-  try {
-    const plaintiffs = JSON.parse(plaintiffGroups);
-    const defendants = JSON.parse(defendantGroups);
-    const plaintiffName = plaintiffs[0]?.plaintiffs?.[0]?.name || "Plaintiff";
-    const defendantName = defendants[0]?.defendants?.[0]?.name || "Defendant";
-    return `${plaintiffName} v. ${defendantName}`;
-  } catch {
-    return "Case";
-  }
 }

@@ -3,11 +3,36 @@ import AttorneySidebar from "@/app/attorney/components/AttorneySidebar";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
-type TeamMember = { name: string; role: string; email: string };
-type Document = {
-  id: number; name: string; description: string; fileUrl?: string 
+type TeamMember = { 
+  Name: string; 
+  Role: string; 
+  Email: string;
 };
-type VoirDire = { question: string; response: string; addedBy: string };
+
+type Document = {
+  Id: number;
+  FileName: string;
+  Description: string;
+  FileUrl: string;
+};
+
+type VoirDire = { 
+  question: string; 
+  response: string; 
+  addedBy: string 
+};
+
+type Application = {
+  ApplicationId: number;
+  JurorId: number;
+  JurorName: string;
+  JurorEmail: string;
+  County: string;
+  Status: "pending" | "approved" | "rejected";
+  VoirDire1Responses: string;
+  VoirDire2Responses: string;
+  AppliedAt: string;
+};
 
 type CaseData = {
   Id: number;
@@ -19,13 +44,22 @@ type CaseData = {
 function getFirstName(groups: string, key: "plaintiffs" | "defendants") {
   try {
     const arr = JSON.parse(groups);
-    return arr[0]?.[key]?.[0]?.name || "";
+    return arr[0]?.[key]?.[0]?.Name || "";
   } catch {
     return "";
   }
 }
 
-const API_BASE = "http://localhost:4000/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL 
+  ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, '')
+  : "http://localhost:4000";
+
+function getCookie(name: string) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift();
+  return null;
+}
 
 export default function WarRoomPage() {
   const { id } = useParams();
@@ -33,111 +67,171 @@ export default function WarRoomPage() {
   const caseId = typeof id === "string" ? id : Array.isArray(id) ? id[0] : "";
 
   const [caseData, setCaseData] = useState<CaseData | null>(null);
-
-  // Team Members
   const [showAddTeam, setShowAddTeam] = useState(false);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [newMembers, setNewMembers] = useState<TeamMember[]>([{ name: "", role: "", email: "" }]);
-
-  // Documents
+  const [newMembers, setNewMembers] = useState<TeamMember[]>([{ Name: "", Role: "", Email: "" }]);
   const [showAddDocument, setShowAddDocument] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [description, setDescription] = useState("");
   const [documentation, setDocumentation] = useState<Document[]>([]);
   const [uploadingDocument, setUploadingDocument] = useState(false);
-
-  // Voir Dire
   const [voirDire, setVoirDire] = useState<VoirDire[]>([]);
-
-  // Delete confirmation modal
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteDoc, setDeleteDoc] = useState<Document | null>(null);
   const [deletingDocument, setDeletingDocument] = useState(false);
 
+  // Applications state
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
+  const [showApplicationModal, setShowApplicationModal] = useState(false);
+  const [showApplicationsDropdown, setShowApplicationsDropdown] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
   // Fetch case data
   useEffect(() => {
     if (caseId) {
-      fetch(`${API_BASE}/cases/${caseId}`)
+      const token = getCookie("token");
+      fetch(`${API_BASE}/api/cases/${caseId}`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      })
         .then(res => res.json())
-        .then(data => setCaseData(data));
+        .then(data => setCaseData(data.case || data))
+        .catch(err => console.error("Failed to fetch case:", err));
     }
   }, [caseId]);
 
-  // Fetch war room info (all types)
+  // Fetch war room info using separate endpoints
   useEffect(() => {
     if (caseId) {
-      fetchWarRoomInfo(caseId).then(data => {
-        setTeamMembers(data.TeamMembers || []);
-        setDocumentation(data.Documents || []);
-        setVoirDire(data.VoirDire || []);
+      const token = getCookie("token");
+      const headers = {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      };
+      
+      Promise.all([
+        fetch(`${API_BASE}/api/cases/${caseId}/team`, { headers }).then(r => r.json()),
+        fetch(`${API_BASE}/api/cases/${caseId}/documents`, { headers }).then(r => r.json()),
+        fetch(`${API_BASE}/api/cases/${caseId}/voir-dire`, { headers }).then(r => r.json()),
+        fetch(`${API_BASE}/api/attorney/cases/${caseId}/applications`, { headers }).then(r => r.json())
+      ]).then(([team, docs, vd, apps]) => {
+        setTeamMembers(team || []);
+        setDocumentation(docs || []);
+        setVoirDire(vd || []);
+        setApplications(apps.applications || []);
+      }).catch(err => {
+        console.error("Failed to fetch war room data:", err);
       });
     }
-  }, [caseId, showAddTeam, showAddDocument]);
-
-  // --- API functions ---
-  async function fetchWarRoomInfo(caseId: string) {
-    const res = await fetch(`${API_BASE}/cases/${caseId}/warroom-info`);
-    return await res.json();
-  }
+  }, [caseId]);
 
   async function addTeamMembers(caseId: string, members: TeamMember[]) {
-    for (const member of members) {
-      await fetch(`${API_BASE}/cases/${caseId}/warroom-info`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamMember: member }),
-      });
-    }
+  const token = getCookie("token");
+  for (const member of members) {
+    await fetch(`${API_BASE}/api/cases/${caseId}/team`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        name: member.Name,    // Convert to lowercase
+        role: member.Role,    // Convert to lowercase
+        email: member.Email   // Convert to lowercase
+      }),
+    });
   }
+  const res = await fetch(`${API_BASE}/api/cases/${caseId}/team`, {
+    headers: { "Authorization": `Bearer ${token}` }
+  });
+  const data = await res.json();
+  setTeamMembers(data || []);
+}
 
   async function uploadDocument(caseId: string, file: File, description: string) {
+    const token = getCookie("token");
     const formData = new FormData();
     formData.append("file", file);
     formData.append("description", description);
 
-    await fetch(`${API_BASE}/cases/${caseId}/warroom-info`, {
+    await fetch(`${API_BASE}/api/cases/${caseId}/documents`, {
       method: "POST",
+      headers: { "Authorization": `Bearer ${token}` },
       body: formData,
     });
-  }
-
-  async function deleteDocument(caseId: string, docName: string) {
-  const res = await fetch(
-    `${API_BASE}/cases/${caseId}/warroom-info/documents/${encodeURIComponent(docName)}`,
-    {
-      method: "DELETE",
-    }
-  );
-
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Failed to delete document");
-  }
-
-  return await res.json();
-}
-
-
-  async function addVoirDire(caseId: string, question: string, response: string, addedBy: string) {
-    await fetch(`${API_BASE}/cases/${caseId}/warroom-info`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ voirDire: { question, response, addedBy } }),
+    
+    const res = await fetch(`${API_BASE}/api/cases/${caseId}/documents`, {
+      headers: { "Authorization": `Bearer ${token}` }
     });
+    const data = await res.json();
+    setDocumentation(data || []);
   }
 
-  // --- UI ---
+  async function deleteDocument(caseId: string, docId: number) {
+    const token = getCookie("token");
+    const res = await fetch(
+      `${API_BASE}/api/cases/${caseId}/documents/${docId}`,
+      { 
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${token}` }
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to delete document");
+    }
+
+    return await res.json();
+  }
+
+  async function updateApplicationStatus(applicationId: number, status: "approved" | "rejected") {
+    setUpdatingStatus(true);
+    try {
+      const token = getCookie("token");
+      const res = await fetch(`${API_BASE}/api/attorney/applications/${applicationId}/status`, {
+        method: "PUT",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ status })
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to update status");
+      }
+
+      // Refresh applications
+      const appsRes = await fetch(`${API_BASE}/api/attorney/cases/${caseId}/applications`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const appsData = await appsRes.json();
+      setApplications(appsData.applications || []);
+      
+      setShowApplicationModal(false);
+      setSelectedApplication(null);
+    } catch (error) {
+      console.error("Update status error:", error);
+      alert("Failed to update application status");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  }
+
+  const approvedCount = applications.filter(app => app.Status === "approved").length;
+  const pendingCount = applications.filter(app => app.Status === "pending").length;
+
   return (
     <div className="flex min-h-screen bg-[#F7F6F3]">
-      <AttorneySidebar selectedSection={"home"} onSectionChange={function (section: "home" | "cases" | "calendar" | "profile" | "notifications"): void {
-        throw new Error("Function not implemented.");
-      } } />
+      <AttorneySidebar selectedSection={"home"} onSectionChange={() => {}} />
       <div className="flex-1 relative">
-        {/* Main Content */}
         <div className="max-w-4xl mx-auto pt-8 pb-16 px-2">
           {!caseData ? (
             <div className="flex justify-center items-center h-[400px]">
-              {/* Buffer animation */}
               <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#16305B]"></div>
               <span className="ml-4 text-lg text-[#16305B]">Loading...</span>
             </div>
@@ -194,8 +288,8 @@ export default function WarRoomPage() {
                   ) : (
                     teamMembers.map((member, idx) => (
                       <div key={idx} className="flex gap-4 items-center">
-                        <a href="#" className="text-[#16305B] underline font-medium">{member.name}</a>
-                        <span className="text-[#6B7280] text-sm">{member.role}</span>
+                        <a href="#" className="text-[#16305B] underline font-medium">{member.Name}</a>
+                        <span className="text-[#6B7280] text-sm">{member.Role}</span>
                       </div>
                     ))
                   )}
@@ -232,12 +326,14 @@ export default function WarRoomPage() {
                         </td>
                       </tr>
                     ) : (
-                      documentation.map((doc, idx) => (
-                        <tr key={doc.id ?? idx} className="border-t">
+                      documentation.map((doc) => (
+                        <tr key={doc.Id} className="border-t">
                           <td className="py-2 px-3">
-                            <a href={doc.fileUrl || "#"} className="underline text-[#16305B]" target="_blank" rel="noopener noreferrer">{doc.name}</a>
+                            <a href={doc.FileUrl || "#"} className="underline text-[#16305B]" target="_blank" rel="noopener noreferrer">
+                              {doc.FileName}
+                            </a>
                           </td>
-                          <td className="py-2 px-3 italic text-[#363636]">{doc.description}</td>
+                          <td className="py-2 px-3 italic text-[#363636]">{doc.Description}</td>
                           <td className="py-2 px-3">
                             <button
                               title="Delete"
@@ -247,15 +343,12 @@ export default function WarRoomPage() {
                                 setShowDeleteModal(true);
                               }}
                             >
-                              <span className="material-icons">delete</span>
-                            </button>
-                            <button title="More" className="ml-2 text-[#363636] hover:text-[#6B7280]">
-                              <span className="material-icons">more_horiz</span>
+                              🗑️
                             </button>
                           </td>
                         </tr>
                       ))
-                   ) }
+                    )}
                   </tbody>
                 </table>
                 <div className="text-xs text-[#6B7280] mt-2">
@@ -263,24 +356,164 @@ export default function WarRoomPage() {
                 </div>
               </section>
 
-              {/* Voir Dire Section */}
+              {/* Voir Dire Section with Applications */}
               <section className="mb-6">
                 <div className="font-bold text-base mb-2 text-[#363636]">Voir Dire</div>
                 <div className="text-sm text-[#6B7280] mb-2">
-                  Manage the Voir Dire questions and review potential Juror Responses
+                  Manage the Voir Dire questions and review potential Juror Responses ({approvedCount}/7 selected, {pendingCount} pending)
                 </div>
-                <div className="bg-[#F3F4F6] px-4 py-2 rounded font-semibold flex items-center justify-between text-[#363636] border">
-                  <span>Voir Dire (Disqualifier) - Juror Responses</span>
-                  <span className="text-[#6B7280]">⋯</span>
+                <div className="relative">
+                  <div 
+                    className="bg-[#F3F4F6] px-4 py-2 rounded font-semibold flex items-center justify-between text-[#363636] border cursor-pointer hover:bg-gray-200"
+                    onClick={() => setShowApplicationsDropdown(!showApplicationsDropdown)}
+                  >
+                    <span>Voir Dire (Disqualifier) - Juror Responses</span>
+                    <span className="text-[#6B7280]">⋯</span>
+                  </div>
+
+                  {/* Dropdown with Applications */}
+                  {showApplicationsDropdown && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded border shadow-lg z-10">
+                      <table className="w-full text-left">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="py-2 px-3 font-semibold text-[#363636] text-sm">Juror Name</th>
+                            <th className="py-2 px-3 font-semibold text-[#363636] text-sm">County</th>
+                            <th className="py-2 px-3 font-semibold text-[#363636] text-sm">Status</th>
+                            <th className="py-2 px-3 font-semibold text-[#363636] text-sm">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {applications.length === 0 ? (
+                            <tr>
+                              <td colSpan={4} className="py-4 px-3 text-center text-[#6B7280]">
+                                No applications yet
+                              </td>
+                            </tr>
+                          ) : (
+                            applications.map((app) => (
+                              <tr key={app.ApplicationId} className="border-t">
+                                <td className="py-2 px-3 text-[#363636]">{app.JurorName}</td>
+                                <td className="py-2 px-3 text-[#363636]">{app.County}</td>
+                                <td className="py-2 px-3">
+                                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                    app.Status === "approved" ? "bg-green-100 text-green-700" :
+                                    app.Status === "rejected" ? "bg-red-100 text-red-700" :
+                                    "bg-yellow-100 text-yellow-700"
+                                  }`}>
+                                    {app.Status.charAt(0).toUpperCase() + app.Status.slice(1)}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3">
+                                  <button
+                                    className="text-[#16305B] underline text-sm font-medium"
+                                    onClick={() => {
+                                      setSelectedApplication(app);
+                                      setShowApplicationModal(true);
+                                      setShowApplicationsDropdown(false);
+                                    }}
+                                  >
+                                    View Details
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </section>
             </>
           )}
         </div>
 
-        {/* Modals with blur only for main section */}
-        {(showAddTeam || showAddDocument || showDeleteModal) && (
+        {/* Modals */}
+        {(showAddTeam || showAddDocument || showDeleteModal || showApplicationModal) && (
           <div className="absolute inset-0 backdrop-blur-[2px] flex items-center justify-center z-50">
+            {/* Application Details Modal */}
+            {showApplicationModal && selectedApplication && (
+              <div className="bg-white rounded shadow-lg border border-gray-200 p-6 w-[600px] max-h-[80vh] overflow-y-auto">
+                <h2 className="text-xl font-bold mb-4 text-[#16305B]">Application Details</h2>
+                
+                {/* Juror Info */}
+                <div className="mb-4 p-4 bg-gray-50 rounded">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div><span className="font-semibold">Name:</span> {selectedApplication.JurorName}</div>
+                    <div><span className="font-semibold">Email:</span> {selectedApplication.JurorEmail}</div>
+                    <div><span className="font-semibold">County:</span> {selectedApplication.County}</div>
+                    <div><span className="font-semibold">Status:</span> 
+                      <span className={`ml-2 px-2 py-1 rounded text-xs font-semibold ${
+                        selectedApplication.Status === "approved" ? "bg-green-100 text-green-700" :
+                        selectedApplication.Status === "rejected" ? "bg-red-100 text-red-700" :
+                        "bg-yellow-100 text-yellow-700"
+                      }`}>
+                        {selectedApplication.Status.charAt(0).toUpperCase() + selectedApplication.Status.slice(1)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Voir Dire Responses */}
+                <div className="mb-4">
+                  <h3 className="font-bold text-[#16305B] mb-2">Part 1: Standard Questions</h3>
+                  <div className="space-y-3">
+                    {JSON.parse(selectedApplication.VoirDire1Responses).map((item: any, idx: number) => (
+                      <div key={idx} className="p-3 bg-gray-50 rounded">
+                        <div className="text-sm font-semibold text-gray-700 mb-1">{idx + 1}. {item.question}</div>
+                        <div className="text-sm text-gray-600">Answer: <span className="font-semibold">{item.answer}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <h3 className="font-bold text-[#16305B] mb-2">Part 2: Case-Specific Questions</h3>
+                  <div className="space-y-3">
+                    {JSON.parse(selectedApplication.VoirDire2Responses).map((item: any, idx: number) => (
+                      <div key={idx} className="p-3 bg-gray-50 rounded">
+                        <div className="text-sm font-semibold text-gray-700 mb-1">{idx + 1}. {item.question}</div>
+                        <div className="text-sm text-gray-600">Answer: <span className="font-semibold">{item.answer}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 mt-6">
+                  {selectedApplication.Status === "pending" && (
+                    <>
+                      <button
+                        className="flex-1 bg-green-600 text-white px-4 py-2 rounded font-semibold hover:bg-green-700 disabled:opacity-50"
+                        onClick={() => updateApplicationStatus(selectedApplication.ApplicationId, "approved")}
+                        disabled={updatingStatus}
+                      >
+                        {updatingStatus ? "Updating..." : "Approve"}
+                      </button>
+                      <button
+                        className="flex-1 bg-red-600 text-white px-4 py-2 rounded font-semibold hover:bg-red-700 disabled:opacity-50"
+                        onClick={() => updateApplicationStatus(selectedApplication.ApplicationId, "rejected")}
+                        disabled={updatingStatus}
+                      >
+                        {updatingStatus ? "Updating..." : "Reject"}
+                      </button>
+                    </>
+                  )}
+                  <button
+                    className="px-4 py-2 bg-gray-300 text-[#16305B] rounded font-semibold"
+                    onClick={() => {
+                      setShowApplicationModal(false);
+                      setSelectedApplication(null);
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Team Modal */}
             {showAddTeam && (
               <div className="bg-white rounded shadow-lg border border-gray-200 p-6 w-[350px]">
                 <h2 className="text-lg font-bold mb-4 text-[#16305B]">Add Team Member</h2>
@@ -289,33 +522,33 @@ export default function WarRoomPage() {
                     <input
                       type="text"
                       placeholder="Name"
-                      className="border px-2 py-1 rounded w-full mb-2 text-[#16305B] bg-white placeholder:text-[#6B7280] font-medium"
-                      value={member.name}
+                      className="border px-2 py-1 rounded w-full mb-2 text-[#16305B] bg-white"
+                      value={member.Name}
                       onChange={e => {
                         const arr = [...newMembers];
-                        arr[idx].name = e.target.value;
+                        arr[idx].Name = e.target.value;
                         setNewMembers(arr);
                       }}
                     />
                     <input
                       type="text"
                       placeholder="Role"
-                      className="border px-2 py-1 rounded w-full mb-2 text-[#16305B] bg-white placeholder:text-[#6B7280] font-medium"
-                      value={member.role}
+                      className="border px-2 py-1 rounded w-full mb-2 text-[#16305B] bg-white"
+                      value={member.Role}
                       onChange={e => {
                         const arr = [...newMembers];
-                        arr[idx].role = e.target.value;
+                        arr[idx].Role = e.target.value;
                         setNewMembers(arr);
                       }}
                     />
                     <input
                       type="email"
                       placeholder="Email"
-                      className="border px-2 py-1 rounded w-full text-[#16305B] bg-white placeholder:text-[#6B7280] font-medium"
-                      value={member.email}
+                      className="border px-2 py-1 rounded w-full text-[#16305B] bg-white"
+                      value={member.Email}
                       onChange={e => {
                         const arr = [...newMembers];
-                        arr[idx].email = e.target.value;
+                        arr[idx].Email = e.target.value;
                         setNewMembers(arr);
                       }}
                     />
@@ -327,7 +560,7 @@ export default function WarRoomPage() {
                     onClick={async () => {
                       await addTeamMembers(caseId, newMembers);
                       setShowAddTeam(false);
-                      setNewMembers([{ name: "", role: "", email: "" }]);
+                      setNewMembers([{ Name: "", Role: "", Email: "" }]);
                     }}
                   >
                     Add
@@ -342,69 +575,70 @@ export default function WarRoomPage() {
               </div>
             )}
 
+            {/* Document Modal */}
             {showAddDocument && (
               <div className="bg-white rounded shadow-lg border border-gray-200 p-6 w-[350px]">
-              <h2 className="text-lg font-bold mb-4 text-[#16305B]">Add Document</h2>
-              <input
-                type="file"
-                className="mb-2 text-[#16305B] bg-white font-medium"
-                onChange={e => setFile(e.target.files?.[0] || null)}
-              />
-              <input
-                type="text"
-                placeholder="Description"
-                className="border px-2 py-1 rounded w-full mb-2 text-[#16305B] bg-white placeholder:text-[#6B7280] font-medium"
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-              />
-              <div className="flex gap-2 mt-4">
-                <button
-                  className="bg-[#16305B] text-white px-4 py-2 rounded font-semibold"
-                  onClick={async () => {
-                    if (file) {
-                      setUploadingDocument(true);
-                      await uploadDocument(caseId, file, description);
-                      setUploadingDocument(false);
-                      setShowAddDocument(false);
-                      setFile(null);
-                      setDescription("");
-                    }
-                  }}
-                >
-                  {uploadingDocument ? "Uploading..." : "Add"}
-                </button>
-                <button
-                  className="bg-gray-300 text-[#16305B] px-4 py-2 rounded font-semibold"
-                  onClick={() => setShowAddDocument(false)}
-                >
-                  Cancel
-                </button>
+                <h2 className="text-lg font-bold mb-4 text-[#16305B]">Add Document</h2>
+                <input
+                  type="file"
+                  className="mb-2 text-[#16305B] bg-white font-medium"
+                  onChange={e => setFile(e.target.files?.[0] || null)}
+                />
+                <input
+                  type="text"
+                  placeholder="Description"
+                  className="border px-2 py-1 rounded w-full mb-2 text-[#16305B] bg-white"
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                />
+                <div className="flex gap-2 mt-4">
+                  <button
+                    className="bg-[#16305B] text-white px-4 py-2 rounded font-semibold"
+                    onClick={async () => {
+                      if (file) {
+                        setUploadingDocument(true);
+                        await uploadDocument(caseId, file, description);
+                        setUploadingDocument(false);
+                        setShowAddDocument(false);
+                        setFile(null);
+                        setDescription("");
+                      }
+                    }}
+                  >
+                    {uploadingDocument ? "Uploading..." : "Add"}
+                  </button>
+                  <button
+                    className="bg-gray-300 text-[#16305B] px-4 py-2 rounded font-semibold"
+                    onClick={() => setShowAddDocument(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
-            </div>
             )}
 
+            {/* Delete Modal */}
             {showDeleteModal && (
               <div className="bg-white rounded shadow-lg border border-gray-200 p-6 w-[350px]">
                 <h2 className="text-lg font-bold mb-4 text-black">Delete Document</h2>
-                <p className="text-black">Are you sure you want to delete <strong>{deleteDoc?.name}</strong>?</p>
+                <p className="text-black">Are you sure you want to delete <strong>{deleteDoc?.FileName}</strong>?</p>
                 <div className="flex gap-2 mt-4">
                   <button
                     className="bg-[#B10000] text-white px-4 py-2 rounded"
                     onClick={async () => {
-                        if (!deleteDoc) return;
-                        try {
-                          setDeletingDocument(true);
-                          await deleteDocument(caseId, deleteDoc.name); // <-- actual API call
-                          setDocumentation(prev => prev.filter(doc => doc.name !== deleteDoc.name)); // update UI
-                        } catch (err) {
-                          console.error("Delete failed:", err);
-                        } finally {
-                          setDeletingDocument(false);
-                          setShowDeleteModal(false);
-                          setDeleteDoc(null);
-                        }
-                      }}
-
+                      if (!deleteDoc) return;
+                      try {
+                        setDeletingDocument(true);
+                        await deleteDocument(caseId, deleteDoc.Id);
+                        setDocumentation(prev => prev.filter(doc => doc.Id !== deleteDoc.Id));
+                      } catch (err) {
+                        console.error("Delete failed:", err);
+                      } finally {
+                        setDeletingDocument(false);
+                        setShowDeleteModal(false);
+                        setDeleteDoc(null);
+                      }
+                    }}
                   >
                     {deletingDocument ? "Deleting..." : "Delete"}
                   </button>

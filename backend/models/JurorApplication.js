@@ -260,6 +260,29 @@ async function findById(applicationId) {
   }
 }
 
+/**
+ * Find application by juror and case
+ * @param {number} jurorId - Juror ID
+ * @param {number} caseId - Case ID
+ * @returns {Object|null} Application or null
+ */
+async function findByJurorAndCase(jurorId, caseId) {
+  try {
+    const pool = await poolPromise;
+    const result = await pool
+      .request()
+      .input("jurorId", jurorId)
+      .input("caseId", caseId).query(`
+        SELECT * FROM dbo.JurorApplications
+        WHERE JurorId = @jurorId AND CaseId = @caseId
+      `);
+    return result.recordset[0] || null;
+  } catch (error) {
+    console.error("Error finding application by juror and case:", error);
+    throw error;
+  }
+}
+
 module.exports = {
   APPLICATION_STATUSES,
   createApplication,
@@ -270,4 +293,5 @@ module.exports = {
   getApprovedJurorsForCase,
   getPendingApplicationsCount,
   findById,
+  findByJurorAndCase,
 };

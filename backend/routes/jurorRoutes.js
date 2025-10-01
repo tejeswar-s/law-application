@@ -4,7 +4,7 @@ const {
   requireJuror,
   requireJurorOnboarding,
 } = require("../middleware/authMiddleware");
-  
+
 const router = express.Router();
 
 // All routes here require authentication as juror
@@ -24,13 +24,13 @@ router.get("/dashboard", async (req, res) => {
           name: juror.name,
           email: juror.email,
           county: juror.county,
+          state: juror.state,
           verified: juror.verified,
           verificationStatus: juror.verificationStatus,
           onboardingCompleted: juror.onboardingCompleted,
         },
-        // Add more dashboard data as needed
-        availableJobs: [], // Placeholder for job board
-        assignedCases: [], // Placeholder for assigned cases
+        availableJobs: [],
+        assignedCases: [],
       },
     });
   } catch (error) {
@@ -58,26 +58,41 @@ router.get("/profile", async (req, res) => {
         email: juror.Email,
         phone: juror.PhoneNumber,
         county: juror.County,
+        state: juror.State,
         verified: juror.IsVerified,
         verificationStatus: juror.VerificationStatus,
         onboardingCompleted: juror.OnboardingCompleted,
-        isQualifiedInQuiz: !!juror.isQualifiedInQuiz,
+        IntroVideoCompleted: juror.IntroVideoCompleted,
+        JurorQuizCompleted: juror.JurorQuizCompleted,
       },
     });
-    // Mark juror as qualified in quiz (100% score)
-    const jurorController = require("../controllers/jurorController");
-    router.post("/profile/qualified", (req, res) =>
-      jurorController.setQualifiedInQuiz(req, res)
-    );
   } catch (error) {
     console.error("Get juror profile error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
+// Update task completion (video or quiz)
+router.post("/profile/task/:taskType", async (req, res) => {
+  try {
+    const jurorId = req.user.id;
+    const { taskType } = req.params;
+
+    await Juror.updateTaskCompletion(jurorId, taskType, true);
+    await Juror.updateOnboardingStatus(jurorId);
+
+    res.json({
+      success: true,
+      message: `${taskType} marked as completed`,
+    });
+  } catch (error) {
+    console.error("Update task error:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 // Update juror profile
 router.put("/profile", async (req, res) => {
-  // Controller logic in jurorController.js
   const controller = require("../controllers/jurorController");
   return controller.updateJurorProfile(req, res);
 });
@@ -93,20 +108,19 @@ router.get("/onboarding", async (req, res) => {
   try {
     const juror = req.user;
 
-    // This would typically come from the database
     const tasks = [
       {
         id: "intro_video",
         title: "Introduction to Quick Verdicts Video",
         duration: "5 minutes",
-        completed: false, // Get from database
+        completed: false,
         description: "Learn about the platform and your role as a juror",
       },
       {
         id: "juror_quiz",
         title: "Juror Quiz",
         duration: "3 minutes",
-        completed: false, // Get from database
+        completed: false,
         description: "Test your understanding of jury service basics",
       },
     ];
@@ -126,10 +140,6 @@ router.get("/onboarding", async (req, res) => {
 router.post("/onboarding/:taskId/complete", async (req, res) => {
   try {
     const { taskId } = req.params;
-    const juror = req.user;
-
-    // Add task completion logic here
-    // This would update the database to mark task as completed
 
     res.json({
       success: true,
@@ -145,7 +155,6 @@ router.post("/onboarding/:taskId/complete", async (req, res) => {
 // Get job board (requires completed onboarding)
 router.get("/jobs", requireJurorOnboarding, async (req, res) => {
   try {
-    // This would typically come from the database
     const jobs = [
       {
         id: 1,
@@ -179,9 +188,6 @@ router.get("/jobs", requireJurorOnboarding, async (req, res) => {
 router.post("/jobs/:jobId/apply", requireJurorOnboarding, async (req, res) => {
   try {
     const { jobId } = req.params;
-    const juror = req.user;
-
-    // Add job application logic here
 
     res.json({
       success: true,
@@ -191,6 +197,130 @@ router.post("/jobs/:jobId/apply", requireJurorOnboarding, async (req, res) => {
   } catch (error) {
     console.error("Apply for job error:", error);
     res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// Get available cases for juror (job board)
+router.get("/cases/available", requireJurorOnboarding, async (req, res) => {
+  try {
+    const juror = req.user;
+    console.log("=== Juror requesting cases ===");
+    console.log("State:", juror.state);
+    console.log("County:", juror.county);
+
+    const Case = require("../models/Case");
+
+    const availableCases = await Case.getAvailableCasesForJuror(
+      juror.state,
+      juror.county
+    );
+
+    console.log("Cases found:", availableCases.length);
+
+    res.json({
+      success: true,
+      cases: availableCases,
+      jurorLocation: {
+        state: juror.state,
+        county: juror.county,
+      },
+    });
+  } catch (error) {
+    console.error("Get available cases error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch available cases",
+    });
+  }
+});
+
+// Submit application for a case
+router.post("/applications/apply", async (req, res) => {
+  try {
+    const jurorId = req.user.id;
+    const { caseId, voirDireResponses } = req.body;
+
+    if (!caseId || !voirDireResponses) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+      });
+    }
+
+    const JurorApplication = require("../models/JurorApplication");
+    const Case = require("../models/Case");
+
+    const caseData = await Case.findById(caseId);
+    if (!caseData) {
+      return res.status(404).json({
+        success: false,
+        message: "Case not found",
+      });
+    }
+
+    const existingApplication = await JurorApplication.findByJurorAndCase(
+      jurorId,
+      caseId
+    );
+    if (existingApplication) {
+      return res.status(400).json({
+        success: false,
+        message: "You have already applied to this case",
+      });
+    }
+
+    const responses = JSON.parse(voirDireResponses);
+
+    const applicationId = await JurorApplication.createApplication({
+      jurorId,
+      caseId,
+      voirDire1Responses: responses.part1 || [],
+      voirDire2Responses: responses.part2 || [],
+    });
+
+    const Notification = require("../models/Notification");
+    await Notification.createNotification({
+      userId: caseData.AttorneyId,
+      userType: "attorney",
+      caseId,
+      type: "APPLICATION_SUBMITTED",
+      title: "New Juror Application",
+      message: `A juror has applied to your case "${caseData.CaseTitle}"`,
+    });
+
+    res.json({
+      success: true,
+      message: "Application submitted successfully",
+      applicationId,
+    });
+  } catch (error) {
+    console.error("Submit application error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to submit application",
+    });
+  }
+});
+
+// Get my applications
+// Get my applications
+router.get("/applications", async (req, res) => {
+  try {
+    const jurorId = req.user.id;
+    const JurorApplication = require("../models/JurorApplication");
+
+    const applications = await JurorApplication.getApplicationsByJuror(jurorId);
+
+    res.json({
+      success: true,
+      applications,
+    });
+  } catch (error) {
+    console.error("Get my applications error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch applications",
+    });
   }
 });
 

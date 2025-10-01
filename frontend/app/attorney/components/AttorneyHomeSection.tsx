@@ -6,7 +6,11 @@ const AttorneyHelp = dynamic(() => import("./AttorneyHelp"), { ssr: false });
 const AttorneyContact = dynamic(() => import("./AttorneyContact"), { ssr: false });
 import { differenceInMinutes, format, parseISO, isToday } from "date-fns";
 import { useRouter } from "next/navigation";
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL 
+  ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, '')
+  : "http://localhost:4000";
+
+console.log("API_BASE configured as:", API_BASE);
 
 type AttorneyUser = {
   firstName: string;
@@ -19,13 +23,20 @@ type AttorneyUser = {
 
 type Case = {
   Id: number;
-  PlaintiffGroups: string; // JSON string
-  DefendantGroups: string; // JSON string
-  ScheduledDate: string;   // e.g., "2025-08-23"
-  ScheduledTime: string;   // e.g., "12:00"
-  attorneyEmail: string;   // added field for attorney's email
-  // ...other fields
+  PlaintiffGroups: string;
+  DefendantGroups: string;
+  ScheduledDate: string;
+  ScheduledTime: string;
+  attorneyEmail: string;
 };
+
+// Helper function to read cookies
+function getCookie(name: string) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift();
+  return null;
+}
 
 function getCaseName(plaintiffGroups: string, defendantGroups: string) {
   try {
@@ -63,7 +74,6 @@ function groupCasesByDate(cases: Case[]) {
   return grouped;
 }
 
-// Add a simple calendar mockup for demo (replace with a real calendar component if needed)
 function CalendarMock({ selectedDates }: { selectedDates: string[] }) {
   return (
     <div className="bg-white rounded shadow p-6 w-[350px] min-h-[350px] flex flex-col items-center justify-center">
@@ -110,12 +120,27 @@ export default function AttorneyHomeSection() {
   useEffect(() => {
     if (user) {
       setLoading(true);
-      // Use user.email here, no need to redeclare user
       console.log("Fetching cases for user:", user.email);
       console.log("API URL:", `${API_BASE}/api/cases?userId=${encodeURIComponent(user.email)}`);
-      fetch(`${API_BASE}/api/cases?userId=${encodeURIComponent(user.email)}`)
+      
+      const token = getCookie("token");
+      console.log("Token from cookie:", token ? "Found" : "Not found");
+      
+      fetch(`${API_BASE}/api/cases?userId=${encodeURIComponent(user.email)}`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      })
         .then(res => res.json())
-        .then(data => setCases(data))
+        .then(data => {
+          console.log("API Response:", data);
+          if (Array.isArray(data)) {
+            setCases(data);
+          } else {
+            console.error("Expected array, got:", data);
+            setCases([]);
+          }
+        })
         .catch(err => {
           console.error("Failed to fetch cases:", err);
         })
@@ -125,6 +150,15 @@ export default function AttorneyHomeSection() {
 
   const handleNewCase = () => {
     router.push("/attorney/state/case-type");
+  };
+
+  const handleCaseClick = (caseId: number) => {
+    router.push(`/attorney/cases/${caseId}`);
+  };
+
+  const handleWarRoomClick = (e: React.MouseEvent, caseId: number) => {
+    e.stopPropagation(); // Prevent card click from firing
+    router.push(`/attorney/cases/${caseId}/war-room`);
   };
 
   const grouped = groupCasesByDate(cases);
@@ -140,7 +174,6 @@ export default function AttorneyHomeSection() {
   }
   return (
     <main className="flex-1 px-10 py-8 bg-[#F7F6F3] transition-all duration-300 ease-in-out">
-      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-[#16305B]">
           Welcome back{user ? `, ${user.firstName}!` : "!"}
@@ -149,7 +182,7 @@ export default function AttorneyHomeSection() {
           <button className="text-[#16305B]" onClick={() => setShowHelp(true)}>Help</button>
         </div>
       </div>
-      {/* Your Cases Section */}
+      
       <section className="mb-8">
         <div className="flex justify-between items-center mb-2">
           <div>
@@ -173,7 +206,8 @@ export default function AttorneyHomeSection() {
               {paginatedCases.map((c) => (
                 <div
                   key={c.Id}
-                  className="bg-white rounded shadow p-3 w-56 flex flex-col justify-between mb-3 text-black"
+                  onClick={() => handleCaseClick(c.Id)}
+                  className="bg-white rounded shadow p-3 w-56 flex flex-col justify-between mb-3 text-black cursor-pointer hover:shadow-lg transition-shadow"
                 >
                   <div>
                     <div className="font-bold text-md mb-1">
@@ -186,8 +220,8 @@ export default function AttorneyHomeSection() {
                   </div>
                   <div>
                     <button
-                      onClick={() => router.push(`/attorney/cases/${c.Id}/war-room`)}
-                      className="mt-2 px-3 py-1 bg-[#16305B] text-white rounded flex items-center gap-2 text-sm font-semibold"
+                      onClick={(e) => handleWarRoomClick(e, c.Id)}
+                      className="mt-2 px-3 py-1 bg-[#16305B] text-white rounded flex items-center gap-2 text-sm font-semibold hover:bg-[#1e417a] transition-colors"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -209,7 +243,6 @@ export default function AttorneyHomeSection() {
                 </div>
               ))}
             </div>
-            {/* Pagination Controls */}
             <div className="flex justify-center items-center mt-4 gap-4">
               <button
                 className="px-3 py-1 rounded bg-[#e6eefc] text-[#16305B] font-semibold disabled:opacity-50"
@@ -247,7 +280,6 @@ export default function AttorneyHomeSection() {
         )}
       </section>
 
-      {/* Upcoming Events Section */}
       <section>
         <div className="flex justify-between items-center mb-2">
           <div>
@@ -256,7 +288,6 @@ export default function AttorneyHomeSection() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-[#16305B] font-semibold">View</span>
-            
             <button
               className={`bg-[#e6eefc] px-2 py-1 rounded ${eventView === "list" ? "ring-2 ring-[#16305B]" : ""}`}
               onClick={() => setEventView("list")}

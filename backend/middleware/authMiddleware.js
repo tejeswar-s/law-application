@@ -58,6 +58,7 @@ async function authMiddleware(req, res, next) {
           type: "juror",
           name: juror.Name,
           phone: juror.PhoneNumber,
+          state: juror.State, // ADDED THIS
           county: juror.County,
           verified: juror.IsVerified,
           verificationStatus: juror.VerificationStatus,
@@ -236,6 +237,8 @@ async function optionalAuth(req, res, next) {
           email: juror.Email,
           type: "juror",
           name: juror.Name,
+          state: juror.State, // ADDED THIS
+          county: juror.County,
           verified: juror.IsVerified,
         };
       }
