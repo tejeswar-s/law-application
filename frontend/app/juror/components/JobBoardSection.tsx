@@ -3,18 +3,14 @@
 import Image from "next/image";
 import {
   QuestionMarkCircleIcon,
-  ArrowUpRightIcon,
   ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
-import {
-  BanknotesIcon,
-  TruckIcon,
-} from "@heroicons/react/24/solid";
+import { TruckIcon } from "@heroicons/react/24/solid";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL 
-  ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, '')
+const API_BASE = process.env.NEXT_PUBLIC_API_URL
+  ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, "")
   : "http://localhost:4000";
 
 type AvailableCase = {
@@ -35,19 +31,23 @@ type AvailableCase = {
   DefendantGroups: string;
 };
 
+// cookie helper
 function getCookie(name: string) {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop()?.split(';').shift();
+  if (parts.length === 2) return parts.pop()?.split(";").shift();
   return null;
 }
 
+// ✅ Reused Attorney-style case name formatter
 function getCaseName(plaintiffGroups: string, defendantGroups: string) {
   try {
     const plaintiffs = JSON.parse(plaintiffGroups);
     const defendants = JSON.parse(defendantGroups);
-    const plaintiffName = plaintiffs[0]?.plaintiffs?.[0]?.name || "Plaintiff";
-    const defendantName = defendants[0]?.defendants?.[0]?.name || "Defendant";
+    const plaintiffName =
+      plaintiffs[0]?.plaintiffs?.[0]?.name || "Plaintiff";
+    const defendantName =
+      defendants[0]?.defendants?.[0]?.name || "Defendant";
     return `${plaintiffName} v. ${defendantName}`;
   } catch {
     return "Case";
@@ -60,8 +60,12 @@ export default function JobBoardSection() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("");
-  const [jurorLocation, setJurorLocation] = useState({ state: "", county: "" });
-  const [showOnboardingRequired, setShowOnboardingRequired] = useState(false);
+  const [jurorLocation, setJurorLocation] = useState({
+    state: "",
+    county: "",
+  });
+  const [showOnboardingRequired, setShowOnboardingRequired] =
+    useState(false);
 
   useEffect(() => {
     fetchAvailableCases();
@@ -71,12 +75,15 @@ export default function JobBoardSection() {
     setLoading(true);
     try {
       const token = getCookie("token");
-      const response = await fetch(`${API_BASE}/api/juror/cases/available`, {
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json"
+      const response = await fetch(
+        `${API_BASE}/api/juror/cases/available`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         }
-      });
+      );
 
       if (response.status === 403) {
         const errorData = await response.json();
@@ -91,7 +98,6 @@ export default function JobBoardSection() {
       }
 
       const data = await response.json();
-      
       if (data.success) {
         setCases(data.cases || []);
         setJurorLocation(data.jurorLocation || { state: "", county: "" });
@@ -107,20 +113,11 @@ export default function JobBoardSection() {
     router.push(`/juror/apply/${caseId}`);
   };
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-  };
-
-  const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSortBy(e.target.value);
-  };
-
   const handleGoToHome = () => {
-  console.log("Redirecting to home..."); // Add this
-  window.location.href = "/juror";
-};
+    window.location.href = "/juror";
+  };
 
-  // Show onboarding required message
+  // show onboarding required message
   if (showOnboardingRequired) {
     return (
       <main className="flex-1 min-h-screen overflow-y-auto p-0">
@@ -134,7 +131,8 @@ export default function JobBoardSection() {
                 Onboarding Required
               </h2>
               <p className="text-gray-600 mb-2">
-                To access the Job Board and apply for cases, you must first complete the onboarding process.
+                To access the Job Board and apply for cases, you must
+                first complete the onboarding process.
               </p>
               <p className="text-gray-600 mb-6">
                 Please complete the following requirements:
@@ -164,18 +162,31 @@ export default function JobBoardSection() {
     );
   }
 
+  // filter cases
   const filteredCases = cases.filter((caseItem) => {
-    const caseName = getCaseName(caseItem.PlaintiffGroups, caseItem.DefendantGroups);
-    return caseName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-           caseItem.CaseTitle.toLowerCase().includes(searchQuery.toLowerCase());
+    const caseName = getCaseName(
+      caseItem.PlaintiffGroups,
+      caseItem.DefendantGroups
+    );
+    return (
+      caseName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      caseItem.CaseTitle.toLowerCase().includes(searchQuery.toLowerCase())
+    );
   });
 
+  // sort cases
   const sortedCases = [...filteredCases].sort((a, b) => {
     if (sortBy === "trialDateAscending") {
-      return new Date(a.ScheduledDate).getTime() - new Date(b.ScheduledDate).getTime();
+      return (
+        new Date(a.ScheduledDate).getTime() -
+        new Date(b.ScheduledDate).getTime()
+      );
     }
     if (sortBy === "trialDateDescending") {
-      return new Date(b.ScheduledDate).getTime() - new Date(a.ScheduledDate).getTime();
+      return (
+        new Date(b.ScheduledDate).getTime() -
+        new Date(a.ScheduledDate).getTime()
+      );
     }
     if (sortBy === "compensationAscending") {
       return a.PaymentAmount - b.PaymentAmount;
@@ -199,7 +210,8 @@ export default function JobBoardSection() {
               Apply to available trial postings
               {jurorLocation.county && (
                 <span className="ml-2 text-[#0C2D57] font-medium">
-                  • Showing cases for {jurorLocation.county}, {jurorLocation.state}
+                  • Showing cases for {jurorLocation.county},{" "}
+                  {jurorLocation.state}
                 </span>
               )}
             </p>
@@ -212,7 +224,7 @@ export default function JobBoardSection() {
           </div>
         </div>
 
-        {/* Search Bar */}
+        {/* Search + Sort */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center w-2/3">
             <input
@@ -220,19 +232,17 @@ export default function JobBoardSection() {
               placeholder="Search cases..."
               className="w-full px-4 py-2 border rounded-md text-sm text-gray-700"
               value={searchQuery}
-              onChange={handleSearchChange}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
             <button className="bg-[#0C2D57] text-white px-4 py-2 rounded-md ml-2">
               Search
             </button>
           </div>
-
-          {/* Sort By Filter */}
           <div className="relative inline-block text-left">
             <select
               className="px-4 py-2 border rounded-md text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0C2D57]"
               value={sortBy}
-              onChange={handleSortChange}
+              onChange={(e) => setSortBy(e.target.value)}
             >
               <option value="">Sort By</option>
               <option value="trialDateAscending">Trial Date (Earliest)</option>
@@ -248,7 +258,9 @@ export default function JobBoardSection() {
           {loading ? (
             <div className="flex justify-center items-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-[#0C2D57]"></div>
-              <span className="ml-4 text-lg text-[#0C2D57]">Loading cases...</span>
+              <span className="ml-4 text-lg text-[#0C2D57]">
+                Loading cases...
+              </span>
             </div>
           ) : sortedCases.length === 0 ? (
             <div className="text-center text-gray-500 py-12 bg-white rounded-lg shadow-sm">
@@ -263,13 +275,19 @@ export default function JobBoardSection() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {sortedCases.map((caseItem) => {
-                const caseName = getCaseName(caseItem.PlaintiffGroups, caseItem.DefendantGroups);
-                const trialDate = new Date(caseItem.ScheduledDate).toLocaleDateString("en-US", {
+                const caseName = getCaseName(
+                  caseItem.PlaintiffGroups,
+                  caseItem.DefendantGroups
+                );
+                const trialDate = new Date(
+                  caseItem.ScheduledDate
+                ).toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",
-                  year: "numeric"
+                  year: "numeric",
                 });
-                const spotsLeft = caseItem.RequiredJurors - caseItem.ApprovedJurors;
+                const spotsLeft =
+                  caseItem.RequiredJurors - caseItem.ApprovedJurors;
 
                 return (
                   <div
@@ -281,34 +299,40 @@ export default function JobBoardSection() {
                         <TruckIcon className="w-7 h-7" />
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-medium text-sm text-[#0C2D57]">{caseName}</h3>
+                        <h3 className="font-medium text-sm text-[#0C2D57]">
+                          {caseName}
+                        </h3>
                         <p className="text-xs text-gray-500 mt-1">
-                          <span className="font-medium">Date:</span> {trialDate}
+                          <span className="font-medium">Date:</span>{" "}
+                          {trialDate}
                         </p>
                         <p className="text-xs text-gray-500">
-                          <span className="font-medium">Time:</span> {caseItem.ScheduledTime}
+                          <span className="font-medium">Time:</span>{" "}
+                          {caseItem.ScheduledTime}
                         </p>
                         <p className="text-xs text-gray-500">
-                          <span className="font-medium">Location:</span> {caseItem.County}
+                          <span className="font-medium">Location:</span>{" "}
+                          {caseItem.County}
                         </p>
                         <p className="text-xs text-green-600 font-medium mt-1">
-                          {spotsLeft} spot{spotsLeft !== 1 ? 's' : ''} left
+                          {spotsLeft} spot
+                          {spotsLeft !== 1 ? "s" : ""} left
                         </p>
                       </div>
                     </div>
-                    
-                    {/* Footer: Apply + Money */}
+
+                    {/* Footer */}
                     <div className="mt-4 flex items-center justify-between">
                       <button
                         onClick={() => handleApply(caseItem.CaseId)}
-                        className="flex items-center justify-center gap-1 w-1/2 py-2 bg-[#0C2D57] text-white rounded hover:bg-[#0a2347] text-sm font-medium transition-colors"
+                        className="flex items-center justify-center gap-1 w-1/2 py-2 bg-[#0C2D57] text-white rounded hover:bg-[#0a2347] transition-colors"
                       >
-                        <ArrowUpRightIcon className="w-4 h-4" />
                         Apply
                       </button>
-                      <div className="flex items-center justify-center gap-1 w-1/2 text-green-600 font-semibold">
-                        <BanknotesIcon className="w-5 h-5" />
-                        <span>${caseItem.PaymentAmount}</span>
+                      <div className="flex items-center gap-1 text-sm text-gray-600">
+                        <span className="font-semibold text-green-700">
+                          ${caseItem.PaymentAmount}
+                        </span>
                       </div>
                     </div>
                   </div>

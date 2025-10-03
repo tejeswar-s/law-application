@@ -257,7 +257,16 @@ export default function WarRoomPage() {
 
   return (
     <div className="flex min-h-screen bg-[#F7F6F3]">
-      <AttorneySidebar selectedSection={"home"} onSectionChange={() => {}} />
+      <AttorneySidebar 
+        selectedSection={"cases"} 
+        onSectionChange={(section) => {
+          if (section === "home") router.push("/attorney");
+          if (section === "profile") router.push("/attorney"); // Will switch to profile
+          if (section === "cases") router.push("/attorney"); // Will switch to cases
+          if (section === "calendar") router.push("/attorney"); // Will switch to calendar
+          if (section === "notifications") router.push("/attorney"); // Will switch to notifications
+        }} 
+      />
       <div className="flex-1 relative">
         <div className="max-w-4xl mx-auto pt-8 pb-16 px-2">
           {!caseData ? (
