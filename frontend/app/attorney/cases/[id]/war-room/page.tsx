@@ -2,6 +2,7 @@
 import AttorneySidebar from "@/app/attorney/components/AttorneySidebar";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { CheckCircleIcon, ExclamationCircleIcon } from "@heroicons/react/24/outline";
 
 type TeamMember = { 
   Name: string; 
@@ -14,12 +15,6 @@ type Document = {
   FileName: string;
   Description: string;
   FileUrl: string;
-};
-
-type VoirDire = { 
-  question: string; 
-  response: string; 
-  addedBy: string 
 };
 
 type Application = {
@@ -39,6 +34,7 @@ type CaseData = {
   PlaintiffGroups: string;
   DefendantGroups: string;
   CaseTier?: string;
+  AttorneyStatus?: string;
 };
 
 function getFirstName(groups: string, key: "plaintiffs" | "defendants") {
@@ -75,7 +71,6 @@ export default function WarRoomPage() {
   const [description, setDescription] = useState("");
   const [documentation, setDocumentation] = useState<Document[]>([]);
   const [uploadingDocument, setUploadingDocument] = useState(false);
-  const [voirDire, setVoirDire] = useState<VoirDire[]>([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteDoc, setDeleteDoc] = useState<Document | null>(null);
   const [deletingDocument, setDeletingDocument] = useState(false);
@@ -86,6 +81,11 @@ export default function WarRoomPage() {
   const [showApplicationModal, setShowApplicationModal] = useState(false);
   const [showApplicationsDropdown, setShowApplicationsDropdown] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  // War room submission state
+  const [submittingWarRoom, setSubmittingWarRoom] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Fetch case data
   useEffect(() => {
@@ -103,7 +103,7 @@ export default function WarRoomPage() {
     }
   }, [caseId]);
 
-  // Fetch war room info using separate endpoints
+  // Fetch war room info
   useEffect(() => {
     if (caseId) {
       const token = getCookie("token");
@@ -115,12 +115,10 @@ export default function WarRoomPage() {
       Promise.all([
         fetch(`${API_BASE}/api/cases/${caseId}/team`, { headers }).then(r => r.json()),
         fetch(`${API_BASE}/api/cases/${caseId}/documents`, { headers }).then(r => r.json()),
-        fetch(`${API_BASE}/api/cases/${caseId}/voir-dire`, { headers }).then(r => r.json()),
         fetch(`${API_BASE}/api/attorney/cases/${caseId}/applications`, { headers }).then(r => r.json())
-      ]).then(([team, docs, vd, apps]) => {
+      ]).then(([team, docs, apps]) => {
         setTeamMembers(team || []);
         setDocumentation(docs || []);
-        setVoirDire(vd || []);
         setApplications(apps.applications || []);
       }).catch(err => {
         console.error("Failed to fetch war room data:", err);
@@ -129,27 +127,27 @@ export default function WarRoomPage() {
   }, [caseId]);
 
   async function addTeamMembers(caseId: string, members: TeamMember[]) {
-  const token = getCookie("token");
-  for (const member of members) {
-    await fetch(`${API_BASE}/api/cases/${caseId}/team`, {
-      method: "POST",
-      headers: { 
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        name: member.Name,    // Convert to lowercase
-        role: member.Role,    // Convert to lowercase
-        email: member.Email   // Convert to lowercase
-      }),
+    const token = getCookie("token");
+    for (const member of members) {
+      await fetch(`${API_BASE}/api/cases/${caseId}/team`, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: member.Name,
+          role: member.Role,
+          email: member.Email
+        }),
+      });
+    }
+    const res = await fetch(`${API_BASE}/api/cases/${caseId}/team`, {
+      headers: { "Authorization": `Bearer ${token}` }
     });
+    const data = await res.json();
+    setTeamMembers(data || []);
   }
-  const res = await fetch(`${API_BASE}/api/cases/${caseId}/team`, {
-    headers: { "Authorization": `Bearer ${token}` }
-  });
-  const data = await res.json();
-  setTeamMembers(data || []);
-}
 
   async function uploadDocument(caseId: string, file: File, description: string) {
     const token = getCookie("token");
@@ -205,7 +203,6 @@ export default function WarRoomPage() {
         throw new Error("Failed to update status");
       }
 
-      // Refresh applications
       const appsRes = await fetch(`${API_BASE}/api/attorney/cases/${caseId}/applications`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
@@ -222,8 +219,41 @@ export default function WarRoomPage() {
     }
   }
 
+  async function handleSubmitWarRoom() {
+    setSubmittingWarRoom(true);
+    setErrorMessage(null);
+    
+    try {
+      const token = getCookie("token");
+      const res = await fetch(`${API_BASE}/api/attorney/cases/${caseId}/submit-war-room`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to submit war room");
+      }
+
+      setShowSuccessMessage(true);
+      setTimeout(() => {
+        router.push("/attorney");
+      }, 2000);
+    } catch (error: any) {
+      console.error("Submit war room error:", error);
+      setErrorMessage(error.message || "Failed to submit war room");
+    } finally {
+      setSubmittingWarRoom(false);
+    }
+  }
+
   const approvedCount = applications.filter(app => app.Status === "approved").length;
   const pendingCount = applications.filter(app => app.Status === "pending").length;
+  const canSubmit = approvedCount >= 7 && caseData?.AttorneyStatus === "war_room";
 
   return (
     <div className="flex min-h-screen bg-[#F7F6F3]">
@@ -237,6 +267,28 @@ export default function WarRoomPage() {
             </div>
           ) : (
             <>
+              {/* Success Message */}
+              {showSuccessMessage && (
+                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded flex items-center gap-3">
+                  <CheckCircleIcon className="w-6 h-6 text-green-600" />
+                  <div>
+                    <p className="font-semibold text-green-800">War Room Submitted!</p>
+                    <p className="text-sm text-green-700">All jurors have been notified. Redirecting...</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Error Message */}
+              {errorMessage && (
+                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded flex items-center gap-3">
+                  <ExclamationCircleIcon className="w-6 h-6 text-red-600" />
+                  <div>
+                    <p className="font-semibold text-red-800">Submission Failed</p>
+                    <p className="text-sm text-red-700">{errorMessage}</p>
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-between items-start mb-2">
                 <button
                   className="text-[#16305B] underline text-sm font-medium"
@@ -250,23 +302,27 @@ export default function WarRoomPage() {
                     <span className="text-2xl text-[#16305B] font-bold">3 days</span>
                     <span title="Help" className="ml-2 text-[#6B7280] cursor-pointer">ⓘ</span>
                   </span>
-                  <button className="mt-2 bg-[#16305B] text-white px-4 py-2 rounded font-semibold shadow hover:bg-[#1e417a]">
-                    Submit War Room
+                  <button 
+                    className={`mt-2 px-4 py-2 rounded font-semibold shadow transition ${
+                      canSubmit 
+                        ? "bg-[#16305B] text-white hover:bg-[#1e417a]" 
+                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    }`}
+                    onClick={handleSubmitWarRoom}
+                    disabled={!canSubmit || submittingWarRoom}
+                  >
+                    {submittingWarRoom ? "Submitting..." : "Submit War Room"}
                   </button>
+                  {!canSubmit && approvedCount < 7 && (
+                    <p className="text-xs text-red-600 mt-1">Need 7 approved jurors ({approvedCount}/7)</p>
+                  )}
                 </div>
               </div>
+
               <h1 className="text-2xl font-bold mt-2 mb-1 text-[#363636]">
                 {getFirstName(caseData.PlaintiffGroups, "plaintiffs")} v. {getFirstName(caseData.DefendantGroups, "defendants")} War Room
               </h1>
               <div className="text-[#363636] font-semibold mb-2">Case # {caseData.Id}</div>
-              <div className="mb-4 flex items-center gap-2">
-                <span className="text-[#363636] text-sm font-medium">
-                  Level 2 Trial Case (5 hours)
-                </span>
-                <button className="ml-2 px-2 py-1 bg-white border border-[#16305B] text-[#16305B] rounded text-xs font-semibold shadow">
-                  Upgrade Trial Level
-                </button>
-              </div>
 
               {/* Team Section */}
               <section className="mb-6">
@@ -351,12 +407,9 @@ export default function WarRoomPage() {
                     )}
                   </tbody>
                 </table>
-                <div className="text-xs text-[#6B7280] mt-2">
-                  All document files will be deleted automatically in 7 days after trial is completed.
-                </div>
               </section>
 
-              {/* Voir Dire Section with Applications */}
+              {/* Voir Dire Section */}
               <section className="mb-6">
                 <div className="font-bold text-base mb-2 text-[#363636]">Voir Dire</div>
                 <div className="text-sm text-[#6B7280] mb-2">
@@ -371,7 +424,6 @@ export default function WarRoomPage() {
                     <span className="text-[#6B7280]">⋯</span>
                   </div>
 
-                  {/* Dropdown with Applications */}
                   {showApplicationsDropdown && (
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded border shadow-lg z-10">
                       <table className="w-full text-left">
@@ -429,15 +481,14 @@ export default function WarRoomPage() {
           )}
         </div>
 
-        {/* Modals */}
+        {/* Modals - keeping existing modals code... */}
         {(showAddTeam || showAddDocument || showDeleteModal || showApplicationModal) && (
           <div className="absolute inset-0 backdrop-blur-[2px] flex items-center justify-center z-50">
-            {/* Application Details Modal */}
+            {/* Application Modal */}
             {showApplicationModal && selectedApplication && (
               <div className="bg-white rounded shadow-lg border border-gray-200 p-6 w-[600px] max-h-[80vh] overflow-y-auto">
                 <h2 className="text-xl font-bold mb-4 text-[#16305B]">Application Details</h2>
                 
-                {/* Juror Info */}
                 <div className="mb-4 p-4 bg-gray-50 rounded">
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div><span className="font-semibold">Name:</span> {selectedApplication.JurorName}</div>
@@ -455,7 +506,6 @@ export default function WarRoomPage() {
                   </div>
                 </div>
 
-                {/* Voir Dire Responses */}
                 <div className="mb-4">
                   <h3 className="font-bold text-[#16305B] mb-2">Part 1: Standard Questions</h3>
                   <div className="space-y-3">
@@ -480,7 +530,6 @@ export default function WarRoomPage() {
                   </div>
                 </div>
 
-                {/* Action Buttons */}
                 <div className="flex gap-2 mt-6">
                   {selectedApplication.Status === "pending" && (
                     <>

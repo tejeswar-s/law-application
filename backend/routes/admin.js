@@ -24,6 +24,7 @@ const {
 // Import models for simple routes
 const Attorney = require("../models/Attorney");
 const Juror = require("../models/Juror");
+const AdminCalendar = require("../models/AdminCalendar");
 
 // Apply authentication middleware to all admin routes
 // Note: Uncomment these when you have admin authentication ready
@@ -117,6 +118,122 @@ router.post("/jurors/:id/verify", async (req, res) => {
   } catch (err) {
     console.error("Error verifying juror:", err);
     res.status(500).json({ error: "Failed to verify juror" });
+  }
+});
+
+// ============================================
+// Admin Calendar Routes
+// ============================================
+
+// GET /api/admin/calendar/blocked - Get blocked time slots
+router.get("/calendar/blocked", async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "startDate and endDate are required",
+      });
+    }
+
+    const blockedSlots = await AdminCalendar.getBlockedSlots(
+      startDate,
+      endDate
+    );
+
+    res.json({
+      success: true,
+      blockedSlots,
+    });
+  } catch (error) {
+    console.error("Error fetching blocked slots:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch blocked slots",
+    });
+  }
+});
+
+// GET /api/admin/calendar/available - Get available time slots
+router.get("/calendar/available", async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "startDate and endDate are required",
+      });
+    }
+
+    const availableSlots = await AdminCalendar.getAvailableSlots(
+      startDate,
+      endDate
+    );
+
+    res.json({
+      success: true,
+      availableSlots,
+    });
+  } catch (error) {
+    console.error("Error fetching available slots:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch available slots",
+    });
+  }
+});
+
+// POST /api/admin/calendar/block - Manually block a time slot
+router.post("/calendar/block", async (req, res) => {
+  try {
+    const { blockedDate, blockedTime, reason } = req.body;
+
+    if (!blockedDate || !blockedTime) {
+      return res.status(400).json({
+        success: false,
+        message: "blockedDate and blockedTime are required",
+      });
+    }
+
+    const calendarId = await AdminCalendar.blockSlot({
+      blockedDate,
+      blockedTime,
+      reason: reason || "Manually blocked by admin",
+    });
+
+    res.json({
+      success: true,
+      message: "Time slot blocked successfully",
+      calendarId,
+    });
+  } catch (error) {
+    console.error("Error blocking slot:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to block time slot",
+    });
+  }
+});
+
+// DELETE /api/admin/calendar/unblock/:calendarId - Unblock a time slot
+router.delete("/calendar/unblock/:calendarId", async (req, res) => {
+  try {
+    const { calendarId } = req.params;
+
+    await AdminCalendar.unblockSlot(calendarId);
+
+    res.json({
+      success: true,
+      message: "Time slot unblocked successfully",
+    });
+  } catch (error) {
+    console.error("Error unblocking slot:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to unblock time slot",
+    });
   }
 });
 

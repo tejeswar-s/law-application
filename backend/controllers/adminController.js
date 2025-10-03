@@ -8,6 +8,8 @@ const Event = require("../models/Event");
 const Notification = require("../models/Notification");
 const Attorney = require("../models/Attorney");
 const Juror = require("../models/Juror");
+const AdminCalendar = require("../models/AdminCalendar");
+const CaseReschedule = require("../models/CaseReschedule");
 
 /**
  * Get cases pending admin approval
@@ -30,13 +32,13 @@ async function getCasesPendingApproval(req, res) {
 }
 
 /**
- * Approve or reject case
+ * Approve or reject case with structured rejection reasons
  */
 async function reviewCaseApproval(req, res) {
   try {
     const { caseId } = req.params;
-    const { decision, comments, rescheduleDate, rescheduleTime } = req.body;
-    const adminId = req.user?.id || 1; // Default to 1 if no admin auth
+    const { decision, rejectionReason, comments, suggestedSlots } = req.body;
+    const adminId = req.user?.id || 1;
 
     // Validate decision
     if (!["approved", "rejected"].includes(decision)) {
@@ -55,60 +57,132 @@ async function reviewCaseApproval(req, res) {
       });
     }
 
-    let updateData = {
-      adminApprovalStatus: decision,
-      adminComments: comments,
-    };
+    if (decision === "approved") {
+      // APPROVAL FLOW
+      // Block the time slot in admin calendar
+      await AdminCalendar.blockSlotForCase(
+        caseId,
+        caseData.ScheduledDate.toISOString().split("T")[0],
+        caseData.ScheduledTime
+      );
 
-    // Handle rescheduling
-    if (rescheduleDate && rescheduleTime) {
-      updateData.scheduledDate = rescheduleDate;
-      updateData.scheduledTime = rescheduleTime;
+      // Update case status
+      await Case.updateCaseStatus(caseId, {
+        adminApprovalStatus: "approved",
+        adminComments: comments || "Case approved by admin",
+      });
+
+      // Create event
+      await Event.createEvent({
+        caseId,
+        eventType: Event.EVENT_TYPES.ADMIN_APPROVED,
+        description: `Case approved by admin`,
+        triggeredBy: adminId,
+        userType: "admin",
+      });
+
+      // Notify attorney
+      await Notification.createNotification({
+        userId: caseData.AttorneyId,
+        userType: "attorney",
+        caseId,
+        type: Notification.NOTIFICATION_TYPES.CASE_APPROVED,
+        title: "Case Approved",
+        message: `Your case "${caseData.CaseTitle}" has been approved and is now open for juror applications.`,
+      });
+
+      return res.json({
+        success: true,
+        message: "Case approved successfully",
+        decision: "approved",
+      });
+    } else {
+      // REJECTION FLOW
+      if (!rejectionReason) {
+        return res.status(400).json({
+          success: false,
+          message: "Rejection reason is required",
+        });
+      }
+
+      // Update case with rejection
+      const { poolPromise } = require("../config/db");
+      const pool = await poolPromise;
+
+      await pool
+        .request()
+        .input("caseId", caseId)
+        .input("rejectionReason", rejectionReason)
+        .input("comments", comments || "").query(`
+          UPDATE dbo.Cases
+          SET 
+            AdminApprovalStatus = 'rejected',
+            RejectionReason = @rejectionReason,
+            AdminComments = @comments,
+            UpdatedAt = GETUTCDATE()
+          WHERE CaseId = @caseId
+        `);
+
+      // If scheduling conflict, create reschedule request
+      if (
+        rejectionReason === "scheduling_conflict" &&
+        suggestedSlots &&
+        suggestedSlots.length > 0
+      ) {
+        await CaseReschedule.createRescheduleRequest({
+          caseId,
+          rejectionReason,
+          adminComments: comments,
+          suggestedSlots,
+        });
+
+        // Notify attorney with reschedule options
+        await Notification.createNotification({
+          userId: caseData.AttorneyId,
+          userType: "attorney",
+          caseId,
+          type: "case_reschedule_needed",
+          title: "Case Needs Rescheduling",
+          message: `Your case "${caseData.CaseTitle}" conflicts with my schedule. Please review the suggested alternative time slots.`,
+        });
+      } else {
+        // Other rejection reasons - notify attorney
+        await Notification.createNotification({
+          userId: caseData.AttorneyId,
+          userType: "attorney",
+          caseId,
+          type: Notification.NOTIFICATION_TYPES.CASE_REJECTED,
+          title: "Case Rejected",
+          message: `Your case "${
+            caseData.CaseTitle
+          }" was rejected. Reason: ${getRejectionReasonText(
+            rejectionReason
+          )}. ${comments ? "Details: " + comments : ""}`,
+        });
+      }
+
+      // Create event
+      await Event.createEvent({
+        caseId,
+        eventType: Event.EVENT_TYPES.ADMIN_REJECTED,
+        description: `Case rejected: ${rejectionReason}`,
+        triggeredBy: adminId,
+        userType: "admin",
+      });
+
+      return res.json({
+        success: true,
+        message: "Case rejected successfully",
+        decision: "rejected",
+        rejectionReason,
+      });
     }
-
-    // Update case status
-    await Case.updateCaseStatus(caseId, updateData);
-
-    // Create event
-    await Event.createEvent({
-      caseId,
-      eventType:
-        decision === "approved"
-          ? Event.EVENT_TYPES.ADMIN_APPROVED
-          : Event.EVENT_TYPES.ADMIN_REJECTED,
-      description: `Case ${decision} by admin${
-        comments ? ": " + comments : ""
-      }`,
-      triggeredBy: adminId,
-      userType: "admin",
-    });
-
-    // Notify attorney
-    await Notification.createNotification({
-      userId: caseData.AttorneyId,
-      userType: "attorney",
-      caseId,
-      type:
-        decision === "approved"
-          ? Notification.NOTIFICATION_TYPES.CASE_APPROVED
-          : Notification.NOTIFICATION_TYPES.CASE_REJECTED,
-      title: `Case ${decision}`,
-      message:
-        decision === "approved"
-          ? `Your case "${caseData.CaseTitle}" has been approved and is now open for juror applications.`
-          : `Your case "${caseData.CaseTitle}" requires changes: ${comments}`,
-    });
-
-    res.json({
-      success: true,
-      message: `Case ${decision} successfully`,
-      decision,
-    });
   } catch (error) {
     console.error("Review case approval error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to process case approval",
+      error: error.message,
     });
   }
 }
@@ -485,6 +559,25 @@ async function updateSchedule(req, res) {
   }
 }
 
+/**
+ * Helper function to convert rejection reason codes to readable text
+ */
+function getRejectionReasonText(reason) {
+  const reasons = {
+    scheduling_conflict: "Scheduling conflict - I'm unavailable at this time",
+    invalid_case_details:
+      "Invalid case details - Information is incomplete or inappropriate",
+    missing_documentation:
+      "Missing documentation - Required documents not provided",
+    jurisdictional_issues:
+      "Jurisdictional issues - Case outside platform scope",
+    duplicate_submission: "Duplicate submission - This case already exists",
+    insufficient_lead_time: "Insufficient lead time - Trial date too soon",
+    other: "Other reason",
+  };
+  return reasons[reason] || reason;
+}
+
 module.exports = {
   // Case management
   getCasesPendingApproval,
@@ -505,4 +598,7 @@ module.exports = {
   // Schedule management (placeholder)
   getAdminSchedule,
   updateSchedule,
+
+  // Helper
+  getRejectionReasonText,
 };

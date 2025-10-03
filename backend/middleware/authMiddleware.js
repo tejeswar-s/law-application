@@ -8,6 +8,11 @@ const { findByEmail: findJurorByEmail } = require("../models/Juror");
  */
 async function authMiddleware(req, res, next) {
   try {
+    // TEMPORARY: Skip auth for admin routes (remove in production)
+    if (req.path.startsWith("/admin")) {
+      return next();
+    }
+
     // Get token from Authorization header
     const authHeader = req.headers.authorization;
 
@@ -58,7 +63,7 @@ async function authMiddleware(req, res, next) {
           type: "juror",
           name: juror.Name,
           phone: juror.PhoneNumber,
-          state: juror.State, // ADDED THIS
+          state: juror.State,
           county: juror.County,
           verified: juror.IsVerified,
           verificationStatus: juror.VerificationStatus,
@@ -195,6 +200,16 @@ function requireJurorOnboarding(req, res, next) {
 }
 
 /**
+ * Middleware to check if user is admin
+ * PLACEHOLDER: Implement proper admin authentication later
+ */
+function requireAdmin(req, res, next) {
+  // TODO: Implement proper admin check with admin user table
+  // For now, just pass through since we're skipping auth for admin routes
+  next();
+}
+
+/**
  * Optional auth middleware - doesn't fail if no token, but adds user if valid token
  */
 async function optionalAuth(req, res, next) {
@@ -237,7 +252,7 @@ async function optionalAuth(req, res, next) {
           email: juror.Email,
           type: "juror",
           name: juror.Name,
-          state: juror.State, // ADDED THIS
+          state: juror.State,
           county: juror.County,
           verified: juror.IsVerified,
         };
@@ -262,5 +277,6 @@ module.exports = {
   requireJuror,
   requireVerified,
   requireJurorOnboarding,
+  requireAdmin,
   optionalAuth,
 };

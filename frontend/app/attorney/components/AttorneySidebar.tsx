@@ -14,6 +14,7 @@ import {
   LogOut,
   ArrowLeft,
   ArrowRight,
+  AlertCircle,
 } from "lucide-react";
 
 const NAV_BG = "#16305B";
@@ -44,6 +45,7 @@ export default function AttorneySidebar({ selectedSection, onSectionChange }: At
   const [collapsed, setCollapsed] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [rescheduleCount, setRescheduleCount] = useState(0);
   const [hoveredNotifications, setHoveredNotifications] = useState(false);
   const router = useRouter();
 
@@ -67,9 +69,33 @@ export default function AttorneySidebar({ selectedSection, onSectionChange }: At
     }
   };
 
+  const fetchRescheduleCount = async () => {
+    try {
+      const token = getCookie("token");
+      if (!token) return;
+      
+      const res = await fetch(`${API_BASE}/api/attorney/reschedule-requests`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      
+      if (!res.ok) throw new Error('Failed to fetch');
+      
+      const data = await res.json();
+      if (data.success) {
+        setRescheduleCount(data.rescheduleRequests?.length || 0);
+      }
+    } catch (error) {
+      console.error("Failed to fetch reschedule count:", error);
+    }
+  };
+
   useEffect(() => {
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000);
+    fetchRescheduleCount();
+    const interval = setInterval(() => {
+      fetchUnreadCount();
+      fetchRescheduleCount();
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -208,6 +234,37 @@ export default function AttorneySidebar({ selectedSection, onSectionChange }: At
           );
         })}
       </nav>
+
+      {/* Reschedule Requests (if any pending) */}
+      {rescheduleCount > 0 && (
+        <>
+          <div className="mt-4 border-t border-white/20" />
+          <div className="mt-2 px-1">
+            <button
+              type="button"
+              onClick={() => router.push("/attorney/reschedule-requests")}
+              className={`flex items-center rounded transition-all duration-500 ease-in-out cursor-pointer w-full bg-yellow-600/20 hover:bg-yellow-600/30 ${
+                collapsed ? "justify-center py-3" : "px-4 py-3 gap-3"
+              }`}
+            >
+              <div className="flex items-center justify-center w-10 h-10 relative" style={{ color: "#FCD34D" }}>
+                <AlertCircle className="w-6 h-6" />
+                <span className="absolute -top-1 -right-1 bg-yellow-500 text-gray-900 text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                  {rescheduleCount}
+                </span>
+              </div>
+              <span
+                className={`text-[16px] font-semibold whitespace-nowrap transition-all duration-500 ease-in-out ${
+                  collapsed ? "opacity-0 translate-x-[-10px] w-0 overflow-hidden" : "opacity-100 translate-x-0 ml-2"
+                }`}
+                style={{ color: "#FCD34D" }}
+              >
+                Reschedule Needed
+              </span>
+            </button>
+          </div>
+        </>
+      )}
 
       <div className="flex-1" />
 

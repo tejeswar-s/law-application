@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
@@ -15,9 +15,10 @@ function BufferingAnimation() {
   );
 }
 
-const timeSlots = [
+const allTimeSlots = [
+  "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
   "12:00", "12:30", "13:00", "13:30", "14:00", "14:30", 
-  "15:00", "15:30", "16:00", "16:30", "17:00", "17:30"
+  "15:00", "15:30", "16:00", "16:30", "17:00"
 ];
 
 // Calendar utility functions
@@ -49,21 +50,6 @@ const isToday = (date: Date) => {
          date.getFullYear() === today.getFullYear();
 };
 
-const isSameDate = (date1: Date | null, date2: Date) => {
-  if (!date1) return false;
-  return date1.getDate() === date2.getDate() &&
-         date1.getMonth() === date2.getMonth() &&
-         date1.getFullYear() === date2.getFullYear();
-};
-
-const isDateAvailable = (date: Date) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  date.setHours(0, 0, 0, 0);
-  const dayOfWeek = date.getDay();
-  return date >= today && dayOfWeek !== 0 && dayOfWeek !== 6;
-};
-
 const formatDateString = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -77,6 +63,18 @@ const formatDisplayDate = (date: Date) => {
   const day = date.getDate();
   const year = date.getFullYear();
   return `${dayName}, ${monthName} ${day}, ${year}`;
+};
+
+function getCookie(name: string) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift();
+  return null;
+}
+
+type BlockedSlot = {
+  BlockedDate: string;
+  BlockedTime: string;
 };
 
 export default function ScheduleTrialPage() {
@@ -101,6 +99,8 @@ export default function ScheduleTrialPage() {
   const [email, setEmail] = useState("");
   const [scheduled, setScheduled] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
+  const [blockedSlots, setBlockedSlots] = useState<BlockedSlot[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
   const router = useRouter();
 
   const currentYear = currentDate.getFullYear();
@@ -110,6 +110,76 @@ export default function ScheduleTrialPage() {
   
   // Adjust for Monday start (0 = Sunday, 1 = Monday)
   const startOffset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+
+  // Fetch blocked slots when component mounts or month changes
+  useEffect(() => {
+    fetchBlockedSlots();
+  }, [currentYear, currentMonth]);
+
+  const fetchBlockedSlots = async () => {
+    setLoadingSlots(true);
+    try {
+      const startDate = new Date(currentYear, currentMonth, 1);
+      const endDate = new Date(currentYear, currentMonth + 1, 0);
+      
+      const startDateStr = formatDateString(startDate);
+      const endDateStr = formatDateString(endDate);
+
+      const response = await fetch(
+        `${API_BASE}/api/admin/calendar/blocked?startDate=${startDateStr}&endDate=${endDateStr}`
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setBlockedSlots(data.blockedSlots || []);
+      }
+    } catch (error) {
+      console.error("Error fetching blocked slots:", error);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
+  // Check if a date has ANY available time slots
+  const isDateAvailable = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    date.setHours(0, 0, 0, 0);
+    
+    // Must be future date and weekday
+    const dayOfWeek = date.getDay();
+    if (date < today || dayOfWeek === 0 || dayOfWeek === 6) {
+      return false;
+    }
+
+    // Check if date has at least one available time slot
+    const dateStr = formatDateString(date);
+    const blockedTimesForDate = blockedSlots
+      .filter(slot => {
+        const slotDate = new Date(slot.BlockedDate);
+        return formatDateString(slotDate) === dateStr;
+      })
+      .map(slot => slot.BlockedTime.substring(0, 5)); // Get HH:MM format
+
+    // If all time slots are blocked, date is unavailable
+    const availableSlots = allTimeSlots.filter(time => !blockedTimesForDate.includes(time));
+    return availableSlots.length > 0;
+  };
+
+  // Get available time slots for selected date
+  const getAvailableTimeSlots = () => {
+    if (!selectedDate) return [];
+
+    const dateStr = formatDateString(selectedDate);
+    const blockedTimesForDate = blockedSlots
+      .filter(slot => {
+        const slotDate = new Date(slot.BlockedDate);
+        return formatDateString(slotDate) === dateStr;
+      })
+      .map(slot => slot.BlockedTime.substring(0, 5)); // Get HH:MM format
+
+    return allTimeSlots.filter(time => !blockedTimesForDate.includes(time));
+  };
 
   const handlePrevMonth = () => {
     const newDate = new Date(currentYear, currentMonth - 1, 1);
@@ -140,63 +210,61 @@ export default function ScheduleTrialPage() {
   };
 
   const handleComplete = async () => {
-  setRedirecting(true);
+    setRedirecting(true);
 
-  // Read voir dire Part 2 questions from localStorage
-  const voirDire2Questions = JSON.parse(localStorage.getItem("voirDire2Questions") || "[]");
+    const voirDire2Questions = JSON.parse(localStorage.getItem("voirDire2Questions") || "[]");
 
-  const caseDetails = {
-    county: localStorage.getItem("county"),
-    caseType: localStorage.getItem("caseTypeSelection"),
-    caseTier: localStorage.getItem("caseTier"),
-    civilOrCriminal: localStorage.getItem("caseType"),
-    caseDescription: localStorage.getItem("caseDescription"),
-    paymentMethod: localStorage.getItem("paymentMethod"),
-    paymentAmount: localStorage.getItem("paymentAmount"),
-    plaintiffGroups: JSON.parse(localStorage.getItem("plaintiffGroups") || "[]"),
-    defendantGroups: JSON.parse(localStorage.getItem("defendantGroups") || "[]"),
-    scheduledDate: selectedDate ? formatDateString(selectedDate) : '',
-    scheduledTime: selectedTime + ":00",
-    name,
-    email,
+    const caseDetails = {
+      county: localStorage.getItem("county"),
+      caseType: localStorage.getItem("caseTypeSelection"),
+      caseTier: localStorage.getItem("caseTier"),
+      civilOrCriminal: localStorage.getItem("caseType"),
+      caseDescription: localStorage.getItem("caseDescription"),
+      paymentMethod: localStorage.getItem("paymentMethod"),
+      paymentAmount: localStorage.getItem("paymentAmount"),
+      plaintiffGroups: JSON.parse(localStorage.getItem("plaintiffGroups") || "[]"),
+      defendantGroups: JSON.parse(localStorage.getItem("defendantGroups") || "[]"),
+      scheduledDate: selectedDate ? formatDateString(selectedDate) : '',
+      scheduledTime: selectedTime + ":00",
+      name,
+      email,
+    };
+
+    const token = getCookie("token");
+
+    const response = await fetch(`${API_BASE}/api/cases`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        caseType: caseDetails.caseType,
+        caseTier: caseDetails.caseTier,
+        county: caseDetails.county,
+        caseTitle: "Case Title",
+        caseDescription: caseDetails.caseDescription,
+        paymentMethod: caseDetails.paymentMethod,
+        paymentAmount: caseDetails.paymentAmount,
+        scheduledDate: caseDetails.scheduledDate,
+        scheduledTime: caseDetails.scheduledTime,
+        plaintiffGroups: caseDetails.plaintiffGroups,
+        defendantGroups: caseDetails.defendantGroups,
+        voirDire2Questions: voirDire2Questions,
+      }),
+    });
+
+    if (!response.ok) {
+      alert("Failed to create case");
+      setRedirecting(false);
+      return;
+    }
+
+    setTimeout(() => {
+      router.push("/attorney");
+    }, 1800);
   };
 
-  const token = getCookie("token");
-
-  const response = await fetch(`${API_BASE}/api/cases`, {
-    method: "POST",
-    headers: { 
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
-    },
-    body: JSON.stringify({
-      caseType: caseDetails.caseType,
-      caseTier: caseDetails.caseTier,
-      county: caseDetails.county,
-      caseTitle: "Case Title",
-      caseDescription: caseDetails.caseDescription,
-      paymentMethod: caseDetails.paymentMethod,
-      paymentAmount: caseDetails.paymentAmount,
-      scheduledDate: caseDetails.scheduledDate,
-      scheduledTime: caseDetails.scheduledTime,
-      plaintiffGroups: caseDetails.plaintiffGroups,
-      defendantGroups: caseDetails.defendantGroups,
-      voirDire2Questions: voirDire2Questions, // Now reads from localStorage
-    }),
-  });
-
-  if (!response.ok) {
-    alert("Failed to create case");
-    setRedirecting(false);
-    return;
-  }
-
-  setTimeout(() => {
-    router.push("/attorney");
-  }, 1800);
-};
-
-  // Helper to get end time (adds 2.5 hours to start time)
   function getEndTime(start: string) {
     const [h, m] = start.split(":").map(Number);
     let endH = h + 2;
@@ -208,13 +276,7 @@ export default function ScheduleTrialPage() {
     return `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`;
   }
 
-  // Add this helper function after imports
-  function getCookie(name: string) {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop()?.split(';').shift();
-    return null;
-  }
+  const availableTimeSlots = selectedDate ? getAvailableTimeSlots() : [];
 
   return (
     <div className="min-h-screen flex bg-[#faf8f3] font-sans">
@@ -235,6 +297,7 @@ export default function ScheduleTrialPage() {
             <h2 className="text-3xl font-medium mb-4">Quick Verdicts</h2>
             <div className="text-sm leading-relaxed text-blue-100 space-y-3">
               <p>Schedule your trial date and time.</p>
+              <p className="text-xs text-blue-200">⚠️ Only dates with available admin slots are shown</p>
             </div>
           </div>
         </div>
@@ -416,6 +479,9 @@ export default function ScheduleTrialPage() {
                       <>
                         <div className="mb-6">
                           <h3 className="text-xl font-semibold text-gray-900 mb-2">Select a Date & Time</h3>
+                          {loadingSlots && (
+                            <p className="text-sm text-blue-600">Loading available dates...</p>
+                          )}
                         </div>
                         
                         {/* Calendar Header */}
@@ -452,12 +518,10 @@ export default function ScheduleTrialPage() {
                         
                         {/* Calendar Grid */}
                         <div className="grid grid-cols-7 gap-0.5 mb-4">
-                          {/* Empty cells for days before month starts */}
                           {Array.from({ length: startOffset }, (_, index) => (
                             <div key={`empty-${index}`} className="h-8"></div>
                           ))}
                           
-                          {/* Days of the month */}
                           {Array.from({ length: daysInMonth }, (_, index) => {
                             const day = index + 1;
                             const date = new Date(currentYear, currentMonth, day);
@@ -470,11 +534,11 @@ export default function ScheduleTrialPage() {
                                 type="button"
                                 className={`h-8 w-8 text-xs font-medium rounded transition-all ${
                                   isAvailable
-                                    ? "text-gray-900 hover:bg-blue-50 hover:text-blue-600 cursor-pointer"
-                                    : "text-gray-300 cursor-not-allowed"
+                                    ? "text-gray-900 bg-green-50 hover:bg-green-100 hover:text-green-700 cursor-pointer border border-green-200"
+                                    : "text-gray-300 bg-red-50 cursor-not-allowed"
                                 } ${
                                   isTodayDate && isAvailable
-                                    ? "bg-blue-500 text-white hover:bg-blue-600"
+                                    ? "bg-blue-500 text-white hover:bg-blue-600 border-blue-500"
                                     : ""
                                 }`}
                                 disabled={!isAvailable}
@@ -484,6 +548,18 @@ export default function ScheduleTrialPage() {
                               </button>
                             );
                           })}
+                        </div>
+
+                        {/* Legend */}
+                        <div className="mt-4 flex gap-4 text-xs text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <div className="w-4 h-4 bg-green-50 border border-green-200 rounded"></div>
+                            <span>Available</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-4 h-4 bg-red-50 rounded"></div>
+                            <span>Blocked</span>
+                          </div>
                         </div>
 
                         {/* Time Zone */}
@@ -508,22 +584,34 @@ export default function ScheduleTrialPage() {
                           <p className="text-blue-600 font-medium">{formatDisplayDate(selectedDate).split(',')[0]}, {getMonthName(selectedDate.getMonth())} {selectedDate.getDate()}</p>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto pr-2">
-                          {timeSlots.map((slot) => (
+                        {availableTimeSlots.length === 0 ? (
+                          <div className="text-center py-8 text-gray-500">
+                            <p className="font-medium">No available time slots for this date</p>
                             <button
-                              key={slot}
-                              type="button"
-                              className={`py-3 px-4 text-center border rounded-lg font-medium transition-all ${
-                                selectedTime === slot
-                                  ? "bg-blue-500 text-white border-blue-500"
-                                  : "bg-white text-blue-600 border-blue-200 hover:border-blue-300 hover:bg-blue-50"
-                              }`}
-                              onClick={() => handleTimeSelect(slot)}
+                              className="mt-4 text-blue-600 underline"
+                              onClick={() => setSelectedDate(null)}
                             >
-                              {slot}
+                              Choose a different date
                             </button>
-                          ))}
-                        </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto pr-2">
+                            {availableTimeSlots.map((slot) => (
+                              <button
+                                key={slot}
+                                type="button"
+                                className={`py-3 px-4 text-center border rounded-lg font-medium transition-all ${
+                                  selectedTime === slot
+                                    ? "bg-blue-500 text-white border-blue-500"
+                                    : "bg-white text-blue-600 border-blue-200 hover:border-blue-300 hover:bg-blue-50"
+                                }`}
+                                onClick={() => handleTimeSelect(slot)}
+                              >
+                                {slot}
+                              </button>
+                            ))}
+                          </div>
+                        )}
 
                         {/* Time Zone */}
                         <div className="mt-8">
@@ -540,7 +628,7 @@ export default function ScheduleTrialPage() {
                         </div>
                       </>
                     ) : (
-                      // Details Entry Form
+                      // Details Entry Form (keeping same)
                       <>
                         <div className="mb-6">
                           <h3 className="text-xl font-semibold text-gray-900 mb-2">Enter details</h3>

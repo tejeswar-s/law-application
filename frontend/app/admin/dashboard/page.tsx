@@ -47,6 +47,11 @@ type PendingCase = {
   CaseType: string;
 };
 
+type TimeSlot = {
+  date: string;
+  time: string;
+};
+
 export default function AdminDashboard() {
   const [attorneys, setAttorneys] = useState<Attorney[]>([]);
   const [jurors, setJurors] = useState<Juror[]>([]);
@@ -73,60 +78,87 @@ export default function AdminDashboard() {
   const [jurorPage, setJurorPage] = useState(1);
   const PAGE_SIZE = 5;
 
-  // Case approval states
+  // Case rejection states with structured reasons
   const [showCaseRejectModal, setShowCaseRejectModal] = useState(false);
   const [rejectCaseId, setRejectCaseId] = useState<number | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
   const [rejectComments, setRejectComments] = useState("");
+  const [suggestedSlots, setSuggestedSlots] = useState<TimeSlot[]>([
+    { date: "", time: "" },
+    { date: "", time: "" },
+    { date: "", time: "" }
+  ]);
   const [caseActionLoading, setCaseActionLoading] = useState<number | null>(null);
 
   const attorneySectionRef = useRef<HTMLDivElement>(null);
   const jurorSectionRef = useRef<HTMLDivElement>(null);
   const casesSectionRef = useRef<HTMLDivElement>(null);
 
+  const REJECTION_REASONS = [
+    { value: "scheduling_conflict", label: "🔄 Scheduling Conflict - I'm unavailable at this time" },
+    { value: "invalid_case_details", label: "📋 Invalid Case Details - Information incomplete/inappropriate" },
+    { value: "missing_documentation", label: "📄 Missing Documentation - Required documents not provided" },
+    { value: "jurisdictional_issues", label: "⚖️ Jurisdictional Issues - Case outside platform scope" },
+    { value: "duplicate_submission", label: "🔁 Duplicate Submission - Case already exists" },
+    { value: "insufficient_lead_time", label: "⏰ Insufficient Lead Time - Trial date too soon" },
+    { value: "other", label: "✏️ Other - Specify in comments" }
+  ];
+
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
   const fetchDashboardData = async () => {
-    setLoading(true);
-    try {
-      const [dashboardRes, attRes, jurRes, casesRes] = await Promise.all([
-        fetch(`${API_BASE}/api/admin/dashboard`),
-        fetch(`${API_BASE}/api/admin/attorneys`),
-        fetch(`${API_BASE}/api/admin/jurors`),
-        fetch(`${API_BASE}/api/admin/cases/pending`),
-      ]);
+  setLoading(true);
+  try {
+    const [dashboardRes, attRes, jurRes, casesRes] = await Promise.all([
+      fetch(`${API_BASE}/api/admin/dashboard`),
+      fetch(`${API_BASE}/api/admin/attorneys`),
+      fetch(`${API_BASE}/api/admin/jurors`),
+      fetch(`${API_BASE}/api/admin/cases/pending`),
+    ]);
 
-      const dashboardData = await dashboardRes.json();
-      const attData = await attRes.json();
-      const jurData = await jurRes.json();
-      const casesData = await casesRes.json();
+    const dashboardData = await dashboardRes.json();
+    const attData = await attRes.json();
+    const jurData = await jurRes.json();
+    const casesData = await casesRes.json();
 
-      if (dashboardData.success) {
-        setStats(dashboardData.stats);
-        setPendingCases(dashboardData.pendingCases || []);
-      }
-
-      setAttorneys(attData.attorneys || attData);
-      setJurors((jurData.jurors || jurData).map((j: any) => ({
-        JurorId: j.JurorId ?? j.id,
-        Name: j.Name ?? j.name,
-        Email: j.Email ?? j.email,
-        County: j.County ?? j.county,
-        State: j.State ?? j.state,
-        IsVerified: j.IsVerified ?? j.verified,
-        IsActive: j.IsActive ?? j.isActive,
-        OnboardingCompleted: j.OnboardingCompleted ?? j.onboardingCompleted,
-        CreatedAt: j.CreatedAt ?? j.createdAt,
-        VerificationStatus: j.VerificationStatus,
-        CriteriaResponses: j.CriteriaResponses ?? j.criteriaResponses ?? [],
-      })));
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-    } finally {
-      setLoading(false);
+    if (dashboardData.success) {
+      setStats(dashboardData.stats);
+      setPendingCases(dashboardData.pendingCases || []);
     }
-  };
+
+    // Safely handle attorney data - ensure it's an array
+    const attorneysList = Array.isArray(attData.attorneys) 
+      ? attData.attorneys 
+      : (Array.isArray(attData) ? attData : []);
+
+    setAttorneys(attorneysList);
+
+    // Safely handle juror data - ensure it's an array before mapping
+    const jurorsList = Array.isArray(jurData.jurors) 
+      ? jurData.jurors 
+      : (Array.isArray(jurData) ? jurData : []);
+
+    setJurors(jurorsList.map((j: any) => ({
+      JurorId: j.JurorId ?? j.id,
+      Name: j.Name ?? j.name,
+      Email: j.Email ?? j.email,
+      County: j.County ?? j.county,
+      State: j.State ?? j.state,
+      IsVerified: j.IsVerified ?? j.verified,
+      IsActive: j.IsActive ?? j.isActive,
+      OnboardingCompleted: j.OnboardingCompleted ?? j.onboardingCompleted,
+      CreatedAt: j.CreatedAt ?? j.createdAt,
+      VerificationStatus: j.VerificationStatus,
+      CriteriaResponses: j.CriteriaResponses ?? j.criteriaResponses ?? [],
+    })));
+  } catch (error) {
+    console.error("Error fetching dashboard data:", error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Case approval handlers
   const handleApproveCase = async (caseId: number) => {
@@ -142,9 +174,7 @@ export default function AdminDashboard() {
       });
 
       if (response.ok) {
-        // Remove from pending cases
         setPendingCases(prev => prev.filter(c => c.CaseId !== caseId));
-        // Refresh dashboard data
         fetchDashboardData();
         alert("Case approved successfully!");
       } else {
@@ -161,30 +191,55 @@ export default function AdminDashboard() {
 
   const handleRejectCase = (caseId: number) => {
     setRejectCaseId(caseId);
+    setRejectionReason("");
     setRejectComments("");
+    setSuggestedSlots([
+      { date: "", time: "" },
+      { date: "", time: "" },
+      { date: "", time: "" }
+    ]);
     setShowCaseRejectModal(true);
   };
 
   const confirmRejectCase = async () => {
-    if (!rejectCaseId) return;
+    if (!rejectCaseId || !rejectionReason) return;
+    
+    // Validate: if scheduling conflict, need at least one suggested slot
+    if (rejectionReason === "scheduling_conflict") {
+      const validSlots = suggestedSlots.filter(slot => slot.date && slot.time);
+      if (validSlots.length === 0) {
+        alert("Please provide at least one alternative time slot");
+        return;
+      }
+    }
+
+    // Validate: if "other", comments are required
+    if (rejectionReason === "other" && !rejectComments.trim()) {
+      alert("Please provide comments for 'Other' rejection reason");
+      return;
+    }
+
     setCaseActionLoading(rejectCaseId);
     try {
+      const validSlots = suggestedSlots.filter(slot => slot.date && slot.time);
+      
       const response = await fetch(`${API_BASE}/api/admin/cases/${rejectCaseId}/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           decision: "rejected",
-          comments: rejectComments || "Case rejected by admin"
+          rejectionReason,
+          comments: rejectComments || "",
+          suggestedSlots: rejectionReason === "scheduling_conflict" ? validSlots : []
         }),
       });
 
       if (response.ok) {
-        // Remove from pending cases
         setPendingCases(prev => prev.filter(c => c.CaseId !== rejectCaseId));
         setShowCaseRejectModal(false);
         setRejectCaseId(null);
+        setRejectionReason("");
         setRejectComments("");
-        // Refresh dashboard data
         fetchDashboardData();
         alert("Case rejected successfully!");
       } else {
@@ -319,6 +374,7 @@ export default function AdminDashboard() {
   
   return (
     <main className="min-h-screen w-full" style={{ backgroundColor: BG }}>
+      {/* Header - keeping same */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-8 py-6">
           <div className="flex items-center justify-between">
@@ -332,7 +388,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-8 py-8 space-y-8">
-        {/* Stats Cards */}
+        {/* Stats Cards - keeping same */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center">
@@ -395,7 +451,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Quick Actions and Calendar */}
+        {/* Quick Actions - keeping same structure */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1 space-y-4">
             <h2 className="text-xl font-semibold mb-4" style={{ color: BLUE }}>Quick Actions</h2>
@@ -457,7 +513,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Pending Cases - UPDATED WITH APPROVE/REJECT */}
+        {/* Pending Cases - keeping same */}
         <div ref={casesSectionRef} className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
           <div className="flex items-center mb-4">
             <FileText className="h-6 w-6 mr-3" style={{ color: BLUE }} />
@@ -720,7 +776,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Decline Modal */}
+      {/* Decline Modal - keeping same */}
       {showDeclineModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
@@ -740,7 +796,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Criteria Popup */}
+      {/* Criteria Popup - keeping same */}
       {showCriteriaPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
           <div className="bg-white rounded-lg shadow-lg p-6 min-w-[300px] max-w-[90vw]">
@@ -758,26 +814,84 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* UPDATED Case Rejection Modal with Dropdown & Reschedule */}
       {showCaseRejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center mb-4">
               <XCircle className="h-6 w-6 text-red-600 mr-3" />
               <h3 className="text-xl font-semibold text-gray-900">Reject Case</h3>
             </div>
-            <p className="text-gray-600 mb-4">Provide a reason for rejecting this case. The attorney will be notified.</p>
-            <textarea 
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4" 
-              rows={4} 
-              placeholder="Enter reason (required)" 
-              value={rejectComments} 
-              onChange={(e) => setRejectComments(e.target.value)} 
-            />
+            
+            {/* Rejection Reason Dropdown */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Rejection Reason *</label>
+              <select 
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+              >
+                <option value="">Select a reason...</option>
+                {REJECTION_REASONS.map(reason => (
+                  <option key={reason.value} value={reason.value}>{reason.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Suggested Time Slots (only for scheduling_conflict) */}
+            {rejectionReason === "scheduling_conflict" && (
+              <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 className="text-sm font-semibold text-blue-900 mb-3">Suggest Alternative Time Slots (at least 1 required)</h4>
+                <div className="space-y-3">
+                  {suggestedSlots.map((slot, idx) => (
+                    <div key={idx} className="flex gap-2">
+                      <input
+                        type="date"
+                        className="flex-1 border border-gray-300 rounded px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={slot.date}
+                        onChange={(e) => {
+                          const newSlots = [...suggestedSlots];
+                          newSlots[idx].date = e.target.value;
+                          setSuggestedSlots(newSlots);
+                        }}
+                      />
+                      <input
+                        type="time"
+                        className="flex-1 border border-gray-300 rounded px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        value={slot.time}
+                        onChange={(e) => {
+                          const newSlots = [...suggestedSlots];
+                          newSlots[idx].time = e.target.value;
+                          setSuggestedSlots(newSlots);
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Comments */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Additional Comments {rejectionReason === "other" && <span className="text-red-600">*</span>}
+              </label>
+              <textarea 
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                rows={4} 
+                placeholder="Enter additional details..." 
+                value={rejectComments} 
+                onChange={(e) => setRejectComments(e.target.value)} 
+              />
+            </div>
+
+            {/* Action Buttons */}
             <div className="flex justify-end space-x-3">
               <button 
                 onClick={() => {
                   setShowCaseRejectModal(false);
                   setRejectCaseId(null);
+                  setRejectionReason("");
                   setRejectComments("");
                 }} 
                 className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium"
@@ -786,7 +900,7 @@ export default function AdminDashboard() {
               </button>
               <button 
                 onClick={confirmRejectCase} 
-                disabled={caseActionLoading !== null || !rejectComments.trim()}
+                disabled={caseActionLoading !== null || !rejectionReason}
                 className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 font-medium disabled:opacity-50 inline-flex items-center"
               >
                 {caseActionLoading ? (

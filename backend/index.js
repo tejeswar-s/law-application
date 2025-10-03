@@ -17,6 +17,7 @@ const warRoomVoirDireRoutes = require("./routes/warRoomVoirDireRoutes");
 const warRoomInfoRoutes = require("./routes/warRoomInfoRoutes");
 const fileRoutes = require("./routes/fileRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const adminCalendarRoutes = require("./routes/adminCalendarRoutes");
 const adminRoutes = require("./routes/admin");
 // Import middleware
 const errorHandler = require("./middleware/errorHandler");
@@ -105,6 +106,7 @@ app.use("/api", warRoomVoirDireRoutes);
 app.use("/api", warRoomInfoRoutes);
 app.use("/api", fileRoutes);
 app.use("/api", notificationRoutes);
+app.use("/api/admin/calendar", adminCalendarRoutes);
 app.use("/api/admin", adminRoutes);
 
 // Test route for database connection
