@@ -214,6 +214,21 @@ export default function ScheduleTrialPage() {
 
     const voirDire2Questions = JSON.parse(localStorage.getItem("voirDire2Questions") || "[]");
 
+    // Generate case title from plaintiff and defendant names
+    const generateCaseTitle = () => {
+      try {
+        const plaintiffGroups = JSON.parse(localStorage.getItem("plaintiffGroups") || "[]");
+        const defendantGroups = JSON.parse(localStorage.getItem("defendantGroups") || "[]");
+        
+        const plaintiffName = plaintiffGroups[0]?.plaintiffs?.[0]?.name || "Plaintiff";
+        const defendantName = defendantGroups[0]?.defendants?.[0]?.name || "Defendant";
+        
+        return `${plaintiffName} v. ${defendantName}`;
+      } catch {
+        return "Case Title";
+      }
+    };
+
     const caseDetails = {
       county: localStorage.getItem("county"),
       caseType: localStorage.getItem("caseTypeSelection"),
@@ -242,7 +257,7 @@ export default function ScheduleTrialPage() {
         caseType: caseDetails.caseType,
         caseTier: caseDetails.caseTier,
         county: caseDetails.county,
-        caseTitle: "Case Title",
+        caseTitle: generateCaseTitle(), // ✅ Dynamic title instead of hardcoded!
         caseDescription: caseDetails.caseDescription,
         paymentMethod: caseDetails.paymentMethod,
         paymentAmount: caseDetails.paymentAmount,
