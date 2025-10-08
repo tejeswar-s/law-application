@@ -1,12 +1,14 @@
-"use client";
 
+// ===== SCHEDULE TRIAL PAGE =====
+// app/attorney/state/schedule-trail/page.tsx (note the typo in the URL 'trail' instead of 'trial')
+"use client";
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import Stepper from "../../components/Stepper";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
-// Buffering animation component
 function BufferingAnimation() {
   return (
     <div className="flex items-center justify-center">
@@ -21,7 +23,6 @@ const allTimeSlots = [
   "15:00", "15:30", "16:00", "16:30", "17:00"
 ];
 
-// Calendar utility functions
 const getMonthName = (monthIndex: number) => {
   const months = [
     "January", "February", "March", "April", "May", "June",
@@ -78,16 +79,6 @@ type BlockedSlot = {
 };
 
 export default function ScheduleTrialPage() {
-  const steps = [
-    "Case Details",
-    "Plaintiff Details", 
-    "Defendant Details",
-    "Voir Dire Part 1 & 2",
-    "Payment Details",
-    "Review",
-    "Schedule",
-  ];
-
   const [currentDate, setCurrentDate] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -107,11 +98,8 @@ export default function ScheduleTrialPage() {
   const currentMonth = currentDate.getMonth();
   const daysInMonth = getDaysInMonth(currentYear, currentMonth);
   const firstDayOfWeek = getFirstDayOfMonth(currentYear, currentMonth);
-  
-  // Adjust for Monday start (0 = Sunday, 1 = Monday)
   const startOffset = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
 
-  // Fetch blocked slots when component mounts or month changes
   useEffect(() => {
     fetchBlockedSlots();
   }, [currentYear, currentMonth]);
@@ -140,33 +128,28 @@ export default function ScheduleTrialPage() {
     }
   };
 
-  // Check if a date has ANY available time slots
   const isDateAvailable = (date: Date) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     date.setHours(0, 0, 0, 0);
     
-    // Must be future date and weekday
     const dayOfWeek = date.getDay();
     if (date < today || dayOfWeek === 0 || dayOfWeek === 6) {
       return false;
     }
 
-    // Check if date has at least one available time slot
     const dateStr = formatDateString(date);
     const blockedTimesForDate = blockedSlots
       .filter(slot => {
         const slotDate = new Date(slot.BlockedDate);
         return formatDateString(slotDate) === dateStr;
       })
-      .map(slot => slot.BlockedTime.substring(0, 5)); // Get HH:MM format
+      .map(slot => slot.BlockedTime.substring(0, 5));
 
-    // If all time slots are blocked, date is unavailable
     const availableSlots = allTimeSlots.filter(time => !blockedTimesForDate.includes(time));
     return availableSlots.length > 0;
   };
 
-  // Get available time slots for selected date
   const getAvailableTimeSlots = () => {
     if (!selectedDate) return [];
 
@@ -176,7 +159,7 @@ export default function ScheduleTrialPage() {
         const slotDate = new Date(slot.BlockedDate);
         return formatDateString(slotDate) === dateStr;
       })
-      .map(slot => slot.BlockedTime.substring(0, 5)); // Get HH:MM format
+      .map(slot => slot.BlockedTime.substring(0, 5));
 
     return allTimeSlots.filter(time => !blockedTimesForDate.includes(time));
   };
@@ -214,7 +197,6 @@ export default function ScheduleTrialPage() {
 
     const voirDire2Questions = JSON.parse(localStorage.getItem("voirDire2Questions") || "[]");
 
-    // Generate case title from plaintiff and defendant names
     const generateCaseTitle = () => {
       try {
         const plaintiffGroups = JSON.parse(localStorage.getItem("plaintiffGroups") || "[]");
@@ -257,7 +239,7 @@ export default function ScheduleTrialPage() {
         caseType: caseDetails.caseType,
         caseTier: caseDetails.caseTier,
         county: caseDetails.county,
-        caseTitle: generateCaseTitle(), // ✅ Dynamic title instead of hardcoded!
+        caseTitle: generateCaseTitle(),
         caseDescription: caseDetails.caseDescription,
         paymentMethod: caseDetails.paymentMethod,
         paymentAmount: caseDetails.paymentAmount,
@@ -295,7 +277,6 @@ export default function ScheduleTrialPage() {
 
   return (
     <div className="min-h-screen flex bg-[#faf8f3] font-sans">
-      {/* Sidebar */}
       <aside className="hidden lg:flex flex-col w-[265px]">
         <div className="flex-1 text-white bg-[#16305B] relative">
           <div className="absolute top-15 left-0 w-full">
@@ -318,7 +299,6 @@ export default function ScheduleTrialPage() {
         </div>
       </aside>
 
-      {/* Main Content */}
       <section className="flex-1 flex flex-col min-h-screen bg-[#faf8f3] px-0 md:px-0 mb-20">
         {redirecting ? (
           <div className="flex flex-col items-center justify-center w-full h-screen">
@@ -330,40 +310,10 @@ export default function ScheduleTrialPage() {
         ) : (
           <>
             {/* Stepper */}
-            <div className="flex items-center justify-between px-8 pb-8 pt-8">
-              {steps.map((label, idx) => {
-                const isActive = idx === 6;
-                return (
-                  <div key={label} className="flex items-center flex-1">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center
-                          ${isActive ? "border-[#16305B]" : "border-[#bfc6d1] bg-transparent"}
-                        `}
-                      >
-                        <span
-                          className={`w-2.5 h-2.5 rounded-full ${
-                            isActive ? "bg-[#16305B]" : "bg-transparent"
-                          }`}
-                        ></span>
-                      </div>
-                      <span
-                        className={`text-xs leading-tight max-w-[90px] ${
-                          isActive
-                            ? "text-[#16305B] font-semibold"
-                            : "text-[#bfc6d1]"
-                        }`}
-                      >
-                        {label}
-                      </span>
-                    </div>
-                    {idx < steps.length - 1 && (
-                      <div className="flex-1 h-[1px] bg-[#bfc6d1] ml-4 mr-4"></div>
-                    )}
-                  </div>
-                );
-              })}
+            <div className="w-full max-w-6xl mx-auto px-20">
+              <Stepper currentStep={6} />
             </div>
+
             <div className="w-full max-w-4xl mx-auto mb-8 px-6">
               <h1 className="text-3xl font-semibold text-[#333333] mb-2">Schedule Trial</h1>
               <p className="text-[#666666] text-base">
@@ -371,7 +321,6 @@ export default function ScheduleTrialPage() {
               </p>
             </div>
 
-            {/* Scheduled Confirmation */}
             {scheduled ? (
               <div className="flex-1 flex flex-col items-center justify-center">
                 <div className="w-full max-w-xl bg-white rounded-xl shadow border border-[#e5e7eb] flex flex-col items-center py-10 px-8">
@@ -400,7 +349,7 @@ export default function ScheduleTrialPage() {
                       <span>{name || "Joe Attorney"}</span>
                     </div>
                     <div className="flex items-center gap-2 mb-2 text-black">
-                      <span>🕒</span>
+                      <span>🕑</span>
                       <span>
                         {selectedTime && selectedDate
                           ? `${selectedTime} - ${getEndTime(selectedTime)}, ${formatDisplayDate(selectedDate)}`
@@ -426,11 +375,8 @@ export default function ScheduleTrialPage() {
                 </div>
               </div>
             ) : (
-              // Main Scheduling Interface
               <div className="flex-1 flex justify-center">
                 <div className="w-full max-w-6xl bg-white rounded-2xl shadow-sm border border-[#e5e7eb] flex overflow-hidden" style={{ height: 'fit-content' }}>
-                  
-                  {/* Left Info Panel */}
                   <div className="w-80 bg-white p-8 flex flex-col">
                     <div className="flex items-center mb-6">
                       <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center mr-3">
@@ -486,11 +432,8 @@ export default function ScheduleTrialPage() {
                     )}
                   </div>
 
-                  {/* Right Selection Panel */}
                   <div className="flex-1 bg-gray-50 p-8 border-l border-gray-200">
-                    
                     {!selectedDate ? (
-                      // Calendar View
                       <>
                         <div className="mb-6">
                           <h3 className="text-xl font-semibold text-gray-900 mb-2">Select a Date & Time</h3>
@@ -499,7 +442,6 @@ export default function ScheduleTrialPage() {
                           )}
                         </div>
                         
-                        {/* Calendar Header */}
                         <div className="flex items-center justify-between mb-2">
                           <button 
                             onClick={handlePrevMonth}
@@ -522,7 +464,6 @@ export default function ScheduleTrialPage() {
                           </button>
                         </div>
                         
-                        {/* Days of Week */}
                         <div className="grid grid-cols-7 gap-0.5 mb-1">
                           {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map((day) => (
                             <div key={day} className="text-xs font-medium text-gray-500 text-center py-1">
@@ -531,7 +472,6 @@ export default function ScheduleTrialPage() {
                           ))}
                         </div>
                         
-                        {/* Calendar Grid */}
                         <div className="grid grid-cols-7 gap-0.5 mb-4">
                           {Array.from({ length: startOffset }, (_, index) => (
                             <div key={`empty-${index}`} className="h-8"></div>
@@ -565,7 +505,6 @@ export default function ScheduleTrialPage() {
                           })}
                         </div>
 
-                        {/* Legend */}
                         <div className="mt-4 flex gap-4 text-xs text-gray-600">
                           <div className="flex items-center gap-1">
                             <div className="w-4 h-4 bg-green-50 border border-green-200 rounded"></div>
@@ -577,7 +516,6 @@ export default function ScheduleTrialPage() {
                           </div>
                         </div>
 
-                        {/* Time Zone */}
                         <div className="mt-8">
                           <div className="text-sm font-medium text-gray-700 mb-2">Time zone</div>
                           <div className="flex items-center text-sm text-gray-600">
@@ -592,7 +530,6 @@ export default function ScheduleTrialPage() {
                         </div>
                       </>
                     ) : !showDetails ? (
-                      // Time Selection View
                       <>
                         <div className="mb-6">
                           <h3 className="text-xl font-semibold text-gray-900 mb-2">Select a Date & Time</h3>
@@ -628,7 +565,6 @@ export default function ScheduleTrialPage() {
                           </div>
                         )}
 
-                        {/* Time Zone */}
                         <div className="mt-8">
                           <div className="text-sm font-medium text-gray-700 mb-2">Time zone</div>
                           <div className="flex items-center text-sm text-gray-600">
@@ -643,7 +579,6 @@ export default function ScheduleTrialPage() {
                         </div>
                       </>
                     ) : (
-                      // Details Entry Form (keeping same)
                       <>
                         <div className="mb-6">
                           <h3 className="text-xl font-semibold text-gray-900 mb-2">Enter details</h3>

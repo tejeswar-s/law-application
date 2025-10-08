@@ -28,6 +28,7 @@ type Case = {
   ScheduledDate: string;
   ScheduledTime: string;
   attorneyEmail: string;
+  AttorneyStatus?: string; 
 };
 
 // Helper function to read cookies
@@ -219,26 +220,52 @@ export default function AttorneyHomeSection() {
                     </div>
                   </div>
                   <div>
-                    <button
-                      onClick={(e) => handleWarRoomClick(e, c.Id)}
-                      className="mt-2 px-3 py-1 bg-[#16305B] text-white rounded flex items-center gap-2 text-sm font-semibold hover:bg-[#1e417a] transition-colors"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="h-4 w-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
+                    {c.AttorneyStatus === "join_trial" ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/attorney/cases/${c.Id}/trial`);
+                        }}
+                        className="mt-2 px-3 py-1 bg-green-600 text-white rounded flex items-center gap-2 text-sm font-semibold hover:bg-green-700 transition-colors"
                       >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M17 8l4 4m0 0l-4 4m4-4H3"
-                        />
-                      </svg>
-                      War Room
-                    </button>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                          />
+                        </svg>
+                        Join Trial
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => handleWarRoomClick(e, c.Id)}
+                        className="mt-2 px-3 py-1 bg-[#16305B] text-white rounded flex items-center gap-2 text-sm font-semibold hover:bg-[#1e417a] transition-colors"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-4 w-4"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            d="M17 8l4 4m0 0l-4 4m4-4H3"
+                          />
+                        </svg>
+                        War Room
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

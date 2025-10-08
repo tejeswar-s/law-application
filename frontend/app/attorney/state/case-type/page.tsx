@@ -1,17 +1,12 @@
+// ===== CASE TYPE PAGE (FIRST PAGE) =====
+// app/attorney/case-type/page.tsx
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import Image from "next/image";
+
 export default function CaseTypePage() {
   const router = useRouter();
-  const steps = [
-    "Case Details",
-    "Plaintiff Details",
-    "Defendant Details",
-    "Voir Dire Part 1 & 2",
-    "Payment Details",
-    "Review & Submit",
-  ];
   const [selected, setSelected] = useState("");
 
   const handleSelect = (type: string) => {
@@ -20,6 +15,10 @@ export default function CaseTypePage() {
     setTimeout(() => {
       router.push("/attorney/state/case-details");
     }, 300);
+  };
+
+  const handleBack = () => {
+    router.push("/attorney"); // Or wherever you want to go back to
   };
 
   return (
@@ -46,41 +45,38 @@ export default function CaseTypePage() {
           </div>
         </div>
       </aside>
+
       {/* Main Content */}
       <section className="flex-1 flex flex-col min-h-screen px-0 md:px-0 mb-20">
-        <div className="w-full max-w-6xl mx-auto px-20">
-          {/* Stepper */}
-          <div className="flex items-center justify-between px-8 pb-8 pt-8">
-            {steps.map((label, idx) => {
-              const isActive = idx === 0;
-              return (
-                <div key={label} className="flex items-center flex-1">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center
-                        ${isActive ? "border-[#16305B]" : "border-[#bfc6d1] bg-transparent"}
-                      `}
-                    >
-                      <span className={`w-2.5 h-2.5 rounded-full ${isActive ? "bg-[#16305B]" : "bg-transparent"}`}></span>
-                    </div>
-                    <span className={`text-xs leading-tight max-w-[90px] ${isActive ? "text-[#16305B] font-semibold" : "text-[#bfc6d1]"}`}>
-                      {label}
-                    </span>
-                  </div>
-                  {idx < steps.length - 1 && (
-                    <div className="flex-1 h-[1px] bg-[#bfc6d1] ml-4 mr-4"></div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+        {/* Back Button */}
+        <div className="w-full max-w-6xl mx-auto px-20 pt-8">
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 19l-7-7 7-7"
+              />
+            </svg>
+            <span className="font-medium">Back</span>
+          </button>
         </div>
+
         <div className="flex flex-col items-center justify-center mt-20">
           <h1 className="text-3xl font-bold text-[#16305B] mb-4">Case Type</h1>
           <p className="mb-8 text-gray-700">Please select which type of case you are filing for.</p>
           <div className="flex gap-12">
             <button
-              className={`bg-[#f5ecd7] px-10 py-8 rounded shadow text-2xl font-bold text-[#16305B] border-2 ${selected === "state" ? "border-[#16305B]" : "border-transparent"}`}
+              className={`bg-[#f5ecd7] ml-10  px-10 py-8 rounded shadow text-2xl font-bold text-[#16305B] border-2 ${selected === "state" ? "border-[#16305B]" : "border-transparent"}`}
               onClick={() => handleSelect("state")}
             >
               State
@@ -89,7 +85,7 @@ export default function CaseTypePage() {
               </div>
             </button>
             <button
-              className={`bg-[#f5ecd7] px-10 py-8 rounded shadow text-2xl font-bold text-[#16305B] border-2 ${selected === "federal" ? "border-[#16305B]" : "border-transparent"}`}
+              className={`bg-[#f5ecd7] mr-10 px-10 py-8 rounded shadow text-2xl font-bold text-[#16305B] border-2 ${selected === "federal" ? "border-[#16305B]" : "border-transparent"}`}
               onClick={() => handleSelect("federal")}
             >
               Federal

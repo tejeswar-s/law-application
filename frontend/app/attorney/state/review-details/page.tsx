@@ -1,8 +1,11 @@
-"use client";
 
+// ===== REVIEW PAGE =====
+// app/attorney/state/review-details/page.tsx
+"use client";
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Stepper from "../../components/Stepper";
 
 export default function ReviewPage() {
   const [form, setForm] = useState({
@@ -15,17 +18,7 @@ export default function ReviewPage() {
   });
   const [plaintiffGroups, setPlaintiffGroups] = useState<any[]>([]);
   const [defendantGroups, setDefendantGroups] = useState<any[]>([]);
-  const [submitted, setSubmitted] = useState(false);
   const router = useRouter();
-
-  const steps = [
-    "Case Details",
-    "Plaintiff Details",
-    "Defendant Details",
-    "Voir Dire Part 1 & 2",
-    "Payment Details",
-    "Review & Submit",
-  ];
 
   useEffect(() => {
     setForm({
@@ -41,17 +34,11 @@ export default function ReviewPage() {
   }, []);
 
   const handleSubmit = () => {
-    // setSubmitted(true);
     router.push("/attorney/state/schedule-trail");
-  };
-
-  const handleBack = () => {
-    router.push("/attorney/state/payment-details");
   };
 
   return (
     <div className="min-h-screen flex bg-[#faf8f3] font-sans">
-      {/* Sidebar */}
       <aside className="hidden lg:flex flex-col w-[265px]">
         <div className="flex-1 text-white bg-[#16305B] relative">
           <div className="absolute top-15 left-0 w-full">
@@ -72,42 +59,13 @@ export default function ReviewPage() {
           </div>
         </div>
       </aside>
-
-      {/* Main Content */}
       <section className="flex-1 flex flex-col min-h-screen bg-[#faf8f3] px-0 md:px-0 mb-20">
         <div className="w-full max-w-6xl mx-auto px-20">
-          {/* Stepper */}
-          <div className="flex items-center justify-between px-8 pb-8 pt-8">
-            {steps.map((label, idx) => {
-              const isActive = idx === 5;
-              return (
-                <div key={label} className="flex items-center flex-1">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center
-                        ${isActive ? "border-[#16305B]" : "border-[#bfc6d1] bg-transparent"}
-                      `}
-                    >
-                      <span className={`w-2.5 h-2.5 rounded-full ${isActive ? "bg-[#16305B]" : "bg-transparent"}`}></span>
-                    </div>
-                    <span className={`text-xs leading-tight max-w-[90px] ${isActive ? "text-[#16305B] font-semibold" : "text-[#bfc6d1]"}`}>
-                      {label}
-                    </span>
-                  </div>
-                  {idx < steps.length - 1 && (
-                    <div className="flex-1 h-[1px] bg-[#bfc6d1] ml-4 mr-4"></div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <Stepper currentStep={5} />
         </div>
-        {/* Review Details */}
         <div className="flex-1 flex flex-col pl-28">
           <div className="w-full max-w-2xl">
-            <h1 className="text-3xl font-bold text-black mb-8 mt-2">
-              Case Information Review
-            </h1>
+            <h1 className="text-3xl font-bold text-black mb-8 mt-2">Case Information Review</h1>
             <div className="bg-white border border-[#bfc6d1] rounded-lg p-8 mb-8 shadow text-black">
               <p className="mb-2 font-semibold">Please review the information before submitting.</p>
               <div className="mb-4">
@@ -168,29 +126,13 @@ export default function ReviewPage() {
                 <strong>Payment Amount:</strong> {form.paymentAmount}
               </div>
             </div>
-            <div className="flex gap-4">
-              <button
-                type="button"
-                onClick={handleBack}
-                className="w-1/2 bg-[#e0e6f1] text-black font-semibold px-8 py-2 rounded-md hover:bg-[#bfc6d1] transition"
-                disabled={submitted}
-              >
-                Back
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                className="w-1/2 bg-[#16305B] text-white font-semibold px-8 py-2 rounded-md hover:bg-[#0A2342] transition"
-                disabled={submitted}
-              >
-                {submitted ? "Submitted!" : "Pay & Schedule Trial"}
-              </button>
-            </div>
-            {submitted && (
-              <div className="mt-6 text-green-600 font-bold text-center text-xl">
-                🎉 Case details submitted successfully!
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={handleSubmit}
+              className="w-full bg-[#16305B] text-white font-semibold px-8 py-2 rounded-md hover:bg-[#0A2342] transition"
+            >
+              Pay & Schedule Trial
+            </button>
           </div>
         </div>
       </section>

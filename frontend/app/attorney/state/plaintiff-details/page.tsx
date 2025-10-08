@@ -1,18 +1,12 @@
+// app/attorney/state/plaintiff-details/page.tsx
 "use client";
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Stepper from "../../components/Stepper";
 
-type Plaintiff = {
-  name: string;
-  email: string;
-};
-
-type PlaintiffGroup = {
-  reps: Plaintiff[];
-  plaintiffs: Plaintiff[];
-};
+type Plaintiff = { name: string; email: string; };
+type PlaintiffGroup = { reps: Plaintiff[]; plaintiffs: Plaintiff[]; };
 
 export default function PlaintiffDetailsPage() {
   const [groups, setGroups] = useState<PlaintiffGroup[]>([
@@ -21,14 +15,16 @@ export default function PlaintiffDetailsPage() {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const router = useRouter();
 
-  const steps = [
-  "Case Details",
-  "Plaintiff Details",
-  "Defendant Details",
-  "Voir Dire Part 1 & 2",
-  "Payment Details",
-  "Review & Submit",
-];
+  useEffect(() => {
+    const saved = localStorage.getItem("plaintiffGroups");
+    if (saved) {
+      try {
+        setGroups(JSON.parse(saved));
+      } catch (e) {
+        // Keep default
+      }
+    }
+  }, []);
 
   const validate = () => {
     const errors: Record<string, string> = {};
@@ -70,6 +66,12 @@ export default function PlaintiffDetailsPage() {
     setGroups(newGroups);
   };
 
+  const removeRep = (gIdx: number, rIdx: number) => {
+    const newGroups = [...groups];
+    newGroups[gIdx].reps.splice(rIdx, 1);
+    setGroups(newGroups);
+  };
+
   const addPlaintiff = (gIdx: number) => {
     const newGroups = [...groups];
     newGroups[gIdx].plaintiffs.push({ name: "", email: "" });
@@ -87,7 +89,7 @@ export default function PlaintiffDetailsPage() {
   };
 
   const removeGroup = (gIdx: number) => {
-    if (groups.length === 1) return; // Prevent removing the last group
+    if (groups.length === 1) return;
     const newGroups = [...groups];
     newGroups.splice(gIdx, 1);
     setGroups(newGroups);
@@ -95,7 +97,6 @@ export default function PlaintiffDetailsPage() {
 
   return (
     <div className="min-h-screen flex bg-[#faf8f3] font-sans">
-      {/* Sidebar */}
       <aside className="hidden lg:flex flex-col w-[265px]">
         <div className="flex-1 text-white text-gray-700 bg-[#16305B] relative">
           <div className="absolute top-15 left-0 w-full">
@@ -117,53 +118,21 @@ export default function PlaintiffDetailsPage() {
           </div>
         </div>
       </aside>
-
-      {/* Main Content */}
       <section className="flex-1 flex flex-col min-h-screen bg-[#faf8f3] px-0 md:px-0 mb-20">
         <div className="w-full max-w-6xl mx-auto px-20">
-          {/* Stepper */}
-          <div className="flex items-center justify-between px-8 pb-8 pt-8">
-            {steps.map((label, idx) => {
-              const isActive = idx === 1;
-              return (
-                <div key={label} className="flex items-center flex-1">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center
-                        ${isActive ? "border-[#16305B]" : "border-[#bfc6d1] bg-transparent"}
-                      `}
-                    >
-                      <span className={`w-2.5 h-2.5 rounded-full ${isActive ? "bg-[#16305B]" : "bg-transparent"}`}></span>
-                    </div>
-                    <span className={`text-xs leading-tight max-w-[90px] ${isActive ? "text-[#16305B] font-semibold" : "text-[#bfc6d1]"}`}>
-                      {label}
-                    </span>
-                  </div>
-                  {idx < steps.length - 1 && (
-                    <div className="flex-1 h-[1px] bg-[#bfc6d1] ml-4 mr-4"></div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <Stepper currentStep={1} />
         </div>
-
-        {/* Plaintiff Details Form */}
         <div className="flex-1 flex flex-col pl-28">
           <div className="w-full max-w-2xl">
-            <h1 className="text-3xl font-bold text-[#16305B] mb-8 mt-2">
-              Plaintiff Details
-            </h1>
+            <h1 className="text-3xl font-bold text-[#16305B] mb-8 mt-2">Plaintiff Details</h1>
             <form className="space-y-6" onSubmit={handleNext}>
               {groups.map((group, gIdx) => (
                 <div key={gIdx} className="p-4 border rounded-md bg-white space-y-4 relative">
-                  <h2 className="text-lg font-semibold text-[#16305B]">
-                    Plaintiff Group #{gIdx + 1}
-                  </h2>
+                  <h2 className="text-lg font-semibold text-[#16305B]">Plaintiff Group #{gIdx + 1}</h2>
                   {groups.length > 1 && (
                     <button
                       type="button"
-                      className="absolute top-2 right-2 text-red-500 px-2 py-1"
+                      className="absolute top-2 right-2 text-red-500 px-2 py-1 hover:bg-red-50 rounded"
                       onClick={() => removeGroup(gIdx)}
                       title="Remove Group"
                     >
@@ -173,86 +142,98 @@ export default function PlaintiffDetailsPage() {
 
                   {/* Mock Legal Representatives */}
                   {group.reps.map((rep, rIdx) => (
-                    <div key={rIdx} className="space-y-2">
+                    <div key={rIdx} className="space-y-2 border-b pb-4 last:border-b-0">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm font-medium text-[#16305B]">
+                          Mock Legal Representation #{rIdx + 1}
+                        </label>
+                        {group.reps.length > 1 && (
+                          <button
+                            type="button"
+                            className="text-red-500 px-2 py-1 hover:bg-red-50 rounded text-sm"
+                            onClick={() => removeRep(gIdx, rIdx)}
+                            title="Remove Representative"
+                          >
+                            ✕ Remove
+                          </button>
+                        )}
+                      </div>
                       <input
                         type="text"
-                        placeholder="Mock Legal Representation"
+                        placeholder="Mock Legal Representation Name"
                         value={rep.name}
                         onChange={e => updateField(gIdx, "reps", rIdx, "name", e.target.value)}
-                        className="w-full px-4 py-2 border border-[#bfc6d1] text-[#16305B] rounded-md"
+                        className="w-full px-4 py-2 border border-[#bfc6d1] text-[#16305B] rounded-md focus:outline-[#16305B]"
                       />
                       {validationErrors[`repName-${gIdx}-${rIdx}`] && (
-                        <p className="text-red-500 text-sm">
-                          {validationErrors[`repName-${gIdx}-${rIdx}`]}
-                        </p>
+                        <p className="text-red-500 text-sm">{validationErrors[`repName-${gIdx}-${rIdx}`]}</p>
                       )}
                       <input
                         type="email"
                         placeholder="Mock Legal Representation Email"
                         value={rep.email}
                         onChange={e => updateField(gIdx, "reps", rIdx, "email", e.target.value)}
-                        className="w-full px-4 py-2 border border-[#bfc6d1] text-[#16305B] rounded-md"
+                        className="w-full px-4 py-2 border border-[#bfc6d1] text-[#16305B] rounded-md focus:outline-[#16305B]"
                       />
                       {validationErrors[`repEmail-${gIdx}-${rIdx}`] && (
-                        <p className="text-red-500 text-sm">
-                          {validationErrors[`repEmail-${gIdx}-${rIdx}`]}
-                        </p>
+                        <p className="text-red-500 text-sm">{validationErrors[`repEmail-${gIdx}-${rIdx}`]}</p>
                       )}
                     </div>
                   ))}
                   <button
                     type="button"
                     onClick={() => addRep(gIdx)}
-                    className="text-[#16305B] text-sm font-medium"
+                    className="text-[#16305B] text-sm font-medium hover:text-[#0A2342] transition"
                   >
                     + Add Mock Legal Representation
                   </button>
 
                   {/* Plaintiffs */}
-                  {group.plaintiffs.map((p, pIdx) => (
-                    <div key={pIdx} className="space-y-2 flex items-center gap-2">
-                      <input
-                        type="text"
-                        placeholder={`Plaintiff Name #${pIdx + 1}`}
-                        value={p.name}
-                        onChange={e => updateField(gIdx, "plaintiffs", pIdx, "name", e.target.value)}
-                        className="w-full px-4 py-2 border border-[#bfc6d1] text-[#16305B] rounded-md"
-                      />
-                      {group.plaintiffs.length > 1 && (
-                        <button
-                          type="button"
-                          className="text-red-500 px-2 py-1"
-                          onClick={() => removePlaintiff(gIdx, pIdx)}
-                          title="Remove"
-                        >
-                          ✕
-                        </button>
-                      )}
-                      {validationErrors[`plaintiffName-${gIdx}-${pIdx}`] && (
-                        <p className="text-red-500 text-sm">
-                          {validationErrors[`plaintiffName-${gIdx}-${pIdx}`]}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => addPlaintiff(gIdx)}
-                    className="text-[#16305B] text-sm font-medium"
-                  >
-                    + Add Plaintiff
-                  </button>
+                  <div className="pt-4">
+                    <h3 className="text-sm font-medium text-[#16305B] mb-3">Plaintiffs</h3>
+                    {group.plaintiffs.map((p, pIdx) => (
+                      <div key={pIdx} className="space-y-2 mb-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            placeholder={`Plaintiff Name #${pIdx + 1}`}
+                            value={p.name}
+                            onChange={e => updateField(gIdx, "plaintiffs", pIdx, "name", e.target.value)}
+                            className="flex-1 px-4 py-2 border border-[#bfc6d1] text-[#16305B] rounded-md focus:outline-[#16305B]"
+                          />
+                          {group.plaintiffs.length > 1 && (
+                            <button
+                              type="button"
+                              className="text-red-500 px-3 py-2 hover:bg-red-50 rounded"
+                              onClick={() => removePlaintiff(gIdx, pIdx)}
+                              title="Remove Plaintiff"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                        {validationErrors[`plaintiffName-${gIdx}-${pIdx}`] && (
+                          <p className="text-red-500 text-sm">{validationErrors[`plaintiffName-${gIdx}-${pIdx}`]}</p>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => addPlaintiff(gIdx)}
+                      className="text-[#16305B] text-sm font-medium hover:text-[#0A2342] transition"
+                    >
+                      + Add Plaintiff
+                    </button>
+                  </div>
                 </div>
               ))}
-
               <button
                 type="button"
                 onClick={addGroup}
-                className="w-full border border-[#16305B] text-[#16305B] py-2 rounded-md font-medium"
+                className="w-full border border-[#16305B] text-[#16305B] py-2 rounded-md font-medium hover:bg-[#16305B] hover:text-white transition"
               >
                 + Add Another Plaintiff Group
               </button>
-
               <div className="pt-2">
                 <button
                   type="submit"

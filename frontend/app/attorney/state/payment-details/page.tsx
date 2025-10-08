@@ -1,8 +1,10 @@
+// ===== PAYMENT DETAILS PAGE =====
+// app/attorney/state/payment-details/page.tsx
 "use client";
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Stepper from "../../components/Stepper";
 
 export default function PaymentDetailsPage() {
   const [paymentMethod, setPaymentMethod] = useState("");
@@ -10,14 +12,10 @@ export default function PaymentDetailsPage() {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const router = useRouter();
 
-  const steps = [
-  "Case Details",
-  "Plaintiff Details",
-  "Defendant Details",
-  "Voir Dire Part 1 & 2",
-  "Payment Details",
-  "Review & Submit",
-];
+  useEffect(() => {
+    setPaymentMethod(localStorage.getItem("paymentMethod") || "");
+    setPaymentAmount(localStorage.getItem("paymentAmount") || "");
+  }, []);
 
   const validate = () => {
     const errors: Record<string, string> = {};
@@ -37,7 +35,6 @@ export default function PaymentDetailsPage() {
 
   return (
     <div className="min-h-screen flex bg-[#faf8f3] font-sans">
-      {/* Sidebar */}
       <aside className="hidden lg:flex flex-col w-[265px]">
         <div className="flex-1 text-white bg-[#16305B] relative">
           <div className="absolute top-15 left-0 w-full">
@@ -59,43 +56,13 @@ export default function PaymentDetailsPage() {
           </div>
         </div>
       </aside>
-
-      {/* Main Content */}
       <section className="flex-1 flex flex-col min-h-screen bg-[#faf8f3] px-0 md:px-0 mb-20">
         <div className="w-full max-w-6xl mx-auto px-20">
-          {/* Stepper */}
-          <div className="flex items-center justify-between text-gray-700 px-8 pb-8 pt-8">
-            {steps.map((label, idx) => {
-              const isActive = idx === 3;
-              return (
-                <div key={label} className="flex items-center flex-1">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`w-6 h-6 rounded-full border-2 flex items-center justify-center
-                        ${isActive ? "border-[#16305B]" : "border-[#bfc6d1] bg-transparent"}
-                      `}
-                    >
-                      <span className={`w-2.5 h-2.5 rounded-full ${isActive ? "bg-[#16305B]" : "bg-transparent"}`}></span>
-                    </div>
-                    <span className={`text-xs leading-tight max-w-[90px] ${isActive ? "text-[#16305B] font-semibold" : "text-[#bfc6d1]"}`}>
-                      {label}
-                    </span>
-                  </div>
-                  {idx < steps.length - 1 && (
-                    <div className="flex-1 h-[1px] bg-[#bfc6d1] ml-4 mr-4"></div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <Stepper currentStep={4} />
         </div>
-
-        {/* Payment Details Form */}
         <div className="flex-1 flex flex-col pl-28">
           <div className="w-full max-w-2xl">
-            <h1 className="text-3xl font-bold text-[#16305B] mb-8 mt-2">
-              Payment Details
-            </h1>
+            <h1 className="text-3xl font-bold text-[#16305B] mb-8 mt-2">Payment Details</h1>
             <form className="space-y-6" onSubmit={handleNext}>
               <div>
                 <label className="block mb-1 text-[#16305B] font-medium">

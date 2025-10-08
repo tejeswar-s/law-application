@@ -5,7 +5,6 @@ const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
-
 // Import routes
 const authRoutes = require("./routes/authRoutes");
 const attorneyRoutes = require("./routes/attorneyRoutes");
@@ -19,6 +18,7 @@ const fileRoutes = require("./routes/fileRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const adminCalendarRoutes = require("./routes/adminCalendarRoutes");
 const adminRoutes = require("./routes/admin");
+const trialRoutes = require("./routes/trialRoutes");
 // Import middleware
 const errorHandler = require("./middleware/errorHandler");
 
@@ -76,7 +76,7 @@ app.get("/api/health", async (req, res) => {
   try {
     const pool = await poolPromise;
     await pool.request().query("SELECT 1 as test");
-
+    
     res.json({
       status: "OK",
       timestamp: new Date().toISOString(),
@@ -108,13 +108,14 @@ app.use("/api", fileRoutes);
 app.use("/api", notificationRoutes);
 app.use("/api/admin/calendar", adminCalendarRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/trial", trialRoutes);
 
 // Test route for database connection
 app.get("/api/test-db", async (req, res) => {
   try {
     const pool = await poolPromise;
     const result = await pool
-      .request()
+    .request()
       .query("SELECT @@VERSION as version, GETDATE() as currentTime");
     res.json({
       success: true,

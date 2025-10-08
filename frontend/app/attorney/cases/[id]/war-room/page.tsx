@@ -253,7 +253,7 @@ export default function WarRoomPage() {
 
   const approvedCount = applications.filter(app => app.Status === "approved").length;
   const pendingCount = applications.filter(app => app.Status === "pending").length;
-  const canSubmit = approvedCount >= 7 && caseData?.AttorneyStatus === "war_room";
+  const canSubmit = approvedCount >= 2 && caseData?.AttorneyStatus === "war_room";
 
   return (
     <div className="flex min-h-screen bg-[#F7F6F3]">

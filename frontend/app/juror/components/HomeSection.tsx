@@ -267,13 +267,22 @@ export default function HomeSection({ sidebarCollapsed }: { sidebarCollapsed: bo
                       </td>
                       <td className="py-3 px-4">
                         {app.Status === "approved" && (
+                            <div className="flex gap-2">
                           <button
                             className="text-[#0C2D57] underline text-sm font-medium"
                             onClick={() => router.push(`/juror/war-room/${app.CaseId}`)}
                           >
                             View War Room
                           </button>
-                        )}
+
+                           <button
+                              className="px-3 py-1 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700"
+                              onClick={() => router.push(`/juror/trial/${app.CaseId}/setup`)}
+                            >
+                              Join Trial
+                            </button>
+                          </div>
+                        )}  
                       </td>
                     </tr>
                   ))}

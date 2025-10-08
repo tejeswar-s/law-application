@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { Users, UserCheck, Calendar, FileText, AlertCircle, CheckCircle2, Clock, Building2, XCircle } from "lucide-react";
+import { Users, UserCheck, Calendar, FileText, AlertCircle, CheckCircle2, Clock, Building2, XCircle, Video, Timer } from "lucide-react";
 
 const BLUE = "#0A2342";
 const BG = "#FAF9F6";
@@ -78,7 +78,11 @@ export default function AdminDashboard() {
   const [jurorPage, setJurorPage] = useState(1);
   const PAGE_SIZE = 5;
 
-  // Case rejection states with structured reasons
+  // Active trials monitoring states
+  const [todaysTrials, setTodaysTrials] = useState<any[]>([]);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Case rejection states
   const [showCaseRejectModal, setShowCaseRejectModal] = useState(false);
   const [rejectCaseId, setRejectCaseId] = useState<number | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
@@ -108,59 +112,139 @@ export default function AdminDashboard() {
     fetchDashboardData();
   }, []);
 
-  const fetchDashboardData = async () => {
-  setLoading(true);
-  try {
-    const [dashboardRes, attRes, jurRes, casesRes] = await Promise.all([
-      fetch(`${API_BASE}/api/admin/dashboard`),
-      fetch(`${API_BASE}/api/admin/attorneys`),
-      fetch(`${API_BASE}/api/admin/jurors`),
-      fetch(`${API_BASE}/api/admin/cases/pending`),
-    ]);
+  // Fetch today's trials
+  useEffect(() => {
+    const fetchTodaysTrials = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/api/trial/admin/trials/today`);
+        const data = await response.json();
+        if (data.success) {
+          setTodaysTrials(data.trials);
+        }
+      } catch (error) {
+        console.error('Error fetching today\'s trials:', error);
+      }
+    };
 
-    const dashboardData = await dashboardRes.json();
-    const attData = await attRes.json();
-    const jurData = await jurRes.json();
-    const casesData = await casesRes.json();
+    fetchTodaysTrials();
+    const interval = setInterval(fetchTodaysTrials, 60000); // Refresh every minute
+    return () => clearInterval(interval);
+  }, []);
 
-    if (dashboardData.success) {
-      setStats(dashboardData.stats);
-      setPendingCases(dashboardData.pendingCases || []);
+  // Timer for countdown
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Calculate trial status
+  const getTrialStatus = (scheduledDate: string, scheduledTime: string) => {
+    const trialDateTime = new Date(`${scheduledDate.split('T')[0]}T${scheduledTime}`);
+    const now = currentTime;
+    const diffMs = trialDateTime.getTime() - now.getTime();
+    const endTime = new Date(trialDateTime.getTime() + 150 * 60 * 1000); // 150 minutes later
+
+    if (now >= endTime) {
+      return { status: 'ended', canJoin: false, timeText: 'Trial Ended' };
     }
 
-    // Safely handle attorney data - ensure it's an array
-    const attorneysList = Array.isArray(attData.attorneys) 
-      ? attData.attorneys 
-      : (Array.isArray(attData) ? attData : []);
+    if (diffMs <= 0) {
+      const minutesSinceStart = Math.floor((now.getTime() - trialDateTime.getTime()) / 60000);
+      return { 
+        status: 'active', 
+        canJoin: true, 
+        timeText: `In Progress (${minutesSinceStart} min)` 
+      };
+    }
 
-    setAttorneys(attorneysList);
+    const hours = Math.floor(diffMs / 3600000);
+    const minutes = Math.floor((diffMs % 3600000) / 60000);
+    const seconds = Math.floor((diffMs % 60000) / 1000);
 
-    // Safely handle juror data - ensure it's an array before mapping
-    const jurorsList = Array.isArray(jurData.jurors) 
-      ? jurData.jurors 
-      : (Array.isArray(jurData) ? jurData : []);
+    return {
+      status: 'upcoming',
+      canJoin: false,
+      timeText: `Starts in ${hours}h ${minutes}m ${seconds}s`
+    };
+  };
 
-    setJurors(jurorsList.map((j: any) => ({
-      JurorId: j.JurorId ?? j.id,
-      Name: j.Name ?? j.name,
-      Email: j.Email ?? j.email,
-      County: j.County ?? j.county,
-      State: j.State ?? j.state,
-      IsVerified: j.IsVerified ?? j.verified,
-      IsActive: j.IsActive ?? j.isActive,
-      OnboardingCompleted: j.OnboardingCompleted ?? j.onboardingCompleted,
-      CreatedAt: j.CreatedAt ?? j.createdAt,
-      VerificationStatus: j.VerificationStatus,
-      CriteriaResponses: j.CriteriaResponses ?? j.criteriaResponses ?? [],
-    })));
-  } catch (error) {
-    console.error("Error fetching dashboard data:", error);
-  } finally {
-    setLoading(false);
-  }
-};
+  // Handle admin joining trial
+  const handleAdminJoinTrial = async (caseId: number) => {
+    try {
+      const response = await fetch(`${API_BASE}/api/trial/admin-join/${caseId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
 
-  // Case approval handlers
+      if (response.ok) {
+        window.open(`/admin/trial/${caseId}`, '_blank');
+      } else {
+        alert('Failed to join trial');
+      }
+    } catch (error) {
+      console.error('Error joining trial:', error);
+      alert('Failed to join trial');
+    }
+  };
+
+  // Filter active trials (not ended)
+  const activeTrials = todaysTrials.filter(trial => {
+    const status = getTrialStatus(trial.ScheduledDate, trial.ScheduledTime);
+    return status.status !== 'ended';
+  });
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      const [dashboardRes, attRes, jurRes, casesRes] = await Promise.all([
+        fetch(`${API_BASE}/api/admin/dashboard`),
+        fetch(`${API_BASE}/api/admin/attorneys`),
+        fetch(`${API_BASE}/api/admin/jurors`),
+        fetch(`${API_BASE}/api/admin/cases/pending`),
+      ]);
+
+      const dashboardData = await dashboardRes.json();
+      const attData = await attRes.json();
+      const jurData = await jurRes.json();
+      const casesData = await casesRes.json();
+
+      if (dashboardData.success) {
+        setStats(dashboardData.stats);
+        setPendingCases(dashboardData.pendingCases || []);
+      }
+
+      const attorneysList = Array.isArray(attData.attorneys) 
+        ? attData.attorneys 
+        : (Array.isArray(attData) ? attData : []);
+
+      setAttorneys(attorneysList);
+
+      const jurorsList = Array.isArray(jurData.jurors) 
+        ? jurData.jurors 
+        : (Array.isArray(jurData) ? jurData : []);
+
+      setJurors(jurorsList.map((j: any) => ({
+        JurorId: j.JurorId ?? j.id,
+        Name: j.Name ?? j.name,
+        Email: j.Email ?? j.email,
+        County: j.County ?? j.county,
+        State: j.State ?? j.state,
+        IsVerified: j.IsVerified ?? j.verified,
+        IsActive: j.IsActive ?? j.isActive,
+        OnboardingCompleted: j.OnboardingCompleted ?? j.onboardingCompleted,
+        CreatedAt: j.CreatedAt ?? j.createdAt,
+        VerificationStatus: j.VerificationStatus,
+        CriteriaResponses: j.CriteriaResponses ?? j.criteriaResponses ?? [],
+      })));
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleApproveCase = async (caseId: number) => {
     setCaseActionLoading(caseId);
     try {
@@ -204,7 +288,6 @@ export default function AdminDashboard() {
   const confirmRejectCase = async () => {
     if (!rejectCaseId || !rejectionReason) return;
     
-    // Validate: if scheduling conflict, need at least one suggested slot
     if (rejectionReason === "scheduling_conflict") {
       const validSlots = suggestedSlots.filter(slot => slot.date && slot.time);
       if (validSlots.length === 0) {
@@ -213,7 +296,6 @@ export default function AdminDashboard() {
       }
     }
 
-    // Validate: if "other", comments are required
     if (rejectionReason === "other" && !rejectComments.trim()) {
       alert("Please provide comments for 'Other' rejection reason");
       return;
@@ -374,7 +456,7 @@ export default function AdminDashboard() {
   
   return (
     <main className="min-h-screen w-full" style={{ backgroundColor: BG }}>
-      {/* Header - keeping same */}
+      {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-8 py-6">
           <div className="flex items-center justify-between">
@@ -388,7 +470,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-8 py-8 space-y-8">
-        {/* Stats Cards - keeping same */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
             <div className="flex items-center">
@@ -451,7 +533,82 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Quick Actions - keeping same structure */}
+        {/* Active Trials Section - NEW */}
+        {activeTrials.length > 0 && (
+          <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl shadow-sm p-6 border-2 border-purple-200">
+            <div className="flex items-center mb-4">
+              <Video className="h-6 w-6 mr-3 text-purple-600" />
+              <h2 className="text-xl font-semibold text-purple-900">Active Trials - Join to Monitor</h2>
+              <span className="ml-3 px-3 py-1 bg-purple-600 text-white text-sm font-medium rounded-full">
+                {activeTrials.length} Today
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {activeTrials.map((trial) => {
+                const trialStatus = getTrialStatus(trial.ScheduledDate, trial.ScheduledTime);
+                
+                return (
+                  <div 
+                    key={trial.CaseId} 
+                    className="bg-white rounded-lg shadow-md border-2 border-purple-100 p-4 hover:shadow-lg transition-shadow"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h3 className="font-bold text-gray-900 text-sm mb-1">{trial.CaseTitle}</h3>
+                        <p className="text-xs text-gray-600">Case #{trial.CaseId}</p>
+                      </div>
+                      {trialStatus.status === 'active' && (
+                        <span className="flex items-center px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                          <span className="animate-pulse w-2 h-2 bg-green-600 rounded-full mr-1"></span>
+                          Live
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 mb-3">
+                      <div className="flex items-center text-xs text-gray-600">
+                        <Building2 className="h-3 w-3 mr-2" />
+                        {trial.AttorneyName} - {trial.LawFirmName}
+                      </div>
+                      <div className="flex items-center text-xs text-gray-600">
+                        <Calendar className="h-3 w-3 mr-2" />
+                        {new Date(trial.ScheduledDate).toLocaleDateString()} at {trial.ScheduledTime}
+                      </div>
+                      <div className="flex items-center text-xs text-gray-600">
+                        <FileText className="h-3 w-3 mr-2" />
+                        {trial.CaseType} - {trial.County}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                      <div className="flex items-center text-xs font-medium">
+                        <Timer className="h-3 w-3 mr-1" style={{ color: trialStatus.canJoin ? '#10b981' : '#f59e0b' }} />
+                        <span style={{ color: trialStatus.canJoin ? '#10b981' : '#f59e0b' }}>
+                          {trialStatus.timeText}
+                        </span>
+                      </div>
+                      
+                      <button
+                        onClick={() => handleAdminJoinTrial(trial.CaseId)}
+                        disabled={!trialStatus.canJoin}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          trialStatus.canJoin
+                            ? 'bg-purple-600 text-white hover:bg-purple-700 shadow-sm'
+                            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                        }`}
+                      >
+                        {trialStatus.canJoin ? 'Join Trial' : 'Not Started'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Quick Actions and Calendar */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-1 space-y-4">
             <h2 className="text-xl font-semibold mb-4" style={{ color: BLUE }}>Quick Actions</h2>
@@ -513,7 +670,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Pending Cases - keeping same */}
+        {/* Pending Cases */}
         <div ref={casesSectionRef} className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
           <div className="flex items-center mb-4">
             <FileText className="h-6 w-6 mr-3" style={{ color: BLUE }} />
@@ -776,7 +933,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Decline Modal - keeping same */}
+      {/* Decline Modal */}
       {showDeclineModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
@@ -796,7 +953,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Criteria Popup - keeping same */}
+      {/* Criteria Popup */}
       {showCriteriaPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
           <div className="bg-white rounded-lg shadow-lg p-6 min-w-[300px] max-w-[90vw]">
@@ -814,7 +971,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* UPDATED Case Rejection Modal with Dropdown & Reschedule */}
+      {/* Case Rejection Modal */}
       {showCaseRejectModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -823,7 +980,6 @@ export default function AdminDashboard() {
               <h3 className="text-xl font-semibold text-gray-900">Reject Case</h3>
             </div>
             
-            {/* Rejection Reason Dropdown */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">Rejection Reason *</label>
               <select 
@@ -838,7 +994,6 @@ export default function AdminDashboard() {
               </select>
             </div>
 
-            {/* Suggested Time Slots (only for scheduling_conflict) */}
             {rejectionReason === "scheduling_conflict" && (
               <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <h4 className="text-sm font-semibold text-blue-900 mb-3">Suggest Alternative Time Slots (at least 1 required)</h4>
@@ -871,7 +1026,6 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* Comments */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Additional Comments {rejectionReason === "other" && <span className="text-red-600">*</span>}
@@ -885,7 +1039,6 @@ export default function AdminDashboard() {
               />
             </div>
 
-            {/* Action Buttons */}
             <div className="flex justify-end space-x-3">
               <button 
                 onClick={() => {

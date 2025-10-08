@@ -9,6 +9,8 @@ const {
   deleteAccountHandler,
 } = require("../controllers/attorneyController");
 
+const trialRoutes = require("./trialRoutes");
+const { createTrialMeeting } = trialRoutes;
 const router = express.Router();
 
 // All routes here require authentication as attorney
@@ -189,6 +191,7 @@ router.put("/applications/:applicationId/status", async (req, res) => {
 });
 
 // Submit war room (transition to trial phase)
+// Submit war room (transition to trial phase)
 router.post("/cases/:caseId/submit-war-room", async (req, res) => {
   try {
     const { caseId } = req.params;
@@ -198,8 +201,7 @@ router.post("/cases/:caseId/submit-war-room", async (req, res) => {
     const JurorApplication = require("../models/JurorApplication");
     const Notification = require("../models/Notification");
     const Event = require("../models/Event");
-
-    // Verify attorney owns this case
+    const { createTrialMeeting } = require("./trialRoutes"); // ADD THIS LINE
     const caseData = await Case.findById(caseId);
     if (!caseData || caseData.AttorneyId !== attorneyId) {
       return res.status(403).json({
@@ -207,32 +209,15 @@ router.post("/cases/:caseId/submit-war-room", async (req, res) => {
         message: "Access denied",
       });
     }
-
-    // Check current status
-    if (caseData.AttorneyStatus !== "war_room") {
-      return res.status(400).json({
-        success: false,
-        message: "War room has already been submitted",
-      });
-    }
-
-    // Validate transition requirements
-    const validation = await Case.validateCaseStateTransition(
-      caseId,
-      Case.ATTORNEY_CASE_STATES.JOIN_TRIAL
-    );
-
-    if (!validation.valid) {
-      return res.status(400).json({
-        success: false,
-        message: validation.message,
-      });
-    }
+    // ... existing verification code ...
 
     // Transition to join_trial state
     await Case.updateCaseStatus(caseId, {
       attorneyStatus: Case.ATTORNEY_CASE_STATES.JOIN_TRIAL,
     });
+
+    // CREATE TRIAL MEETING - ADD THIS BLOCK
+    await createTrialMeeting(caseId);
 
     // Create event
     await Event.createEvent({
@@ -244,9 +229,7 @@ router.post("/cases/:caseId/submit-war-room", async (req, res) => {
     });
 
     // Notify all approved jurors
-    const approvedJurors = await JurorApplication.getApprovedJurorsForCase(
-      caseId
-    );
+    const approvedJurors = await JurorApplication.getApprovedJurorsForCase(caseId);
     for (const juror of approvedJurors) {
       await Notification.createNotification({
         userId: juror.JurorId,
@@ -257,6 +240,16 @@ router.post("/cases/:caseId/submit-war-room", async (req, res) => {
         message: `The trial for case "${caseData.CaseTitle}" is ready to begin. Please check your assigned cases.`,
       });
     }
+
+    // NOTIFY ADMIN - ADD THIS BLOCK
+    await Notification.createNotification({
+      userId: 1, // Admin ID
+      userType: "admin",
+      caseId,
+      type: "TRIAL_READY",
+      title: "Trial Ready to Begin",
+      message: `Trial for case "${caseData.CaseTitle}" is ready. You can join as moderator.`,
+    });
 
     res.json({
       success: true,

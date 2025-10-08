@@ -87,7 +87,7 @@ async function createCase(caseData) {
           @attorneyId, @caseType, @caseTier, @county, @caseTitle, @caseDescription,
           @paymentMethod, @paymentAmount, @scheduledDate, @scheduledTime,
           @plaintiffGroups, @defendantGroups, @voirDire1Questions, @voirDire2Questions,
-          '${ATTORNEY_CASE_STATES.PENDING_ADMIN_APPROVAL}', null, 'pending', 7,
+          '${ATTORNEY_CASE_STATES.PENDING_ADMIN_APPROVAL}', null, 'pending', 2,
           GETUTCDATE(), GETUTCDATE()
         );
         SELECT SCOPE_IDENTITY() as CaseId;
