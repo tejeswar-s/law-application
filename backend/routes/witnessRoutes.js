@@ -35,4 +35,7 @@ router.get(
   witnessController.getWitnesses
 );
 
+// NEW: Export witnesses as text (Admin/Attorney)
+router.get("/:caseId/witnesses/export/text", witnessController.exportAsText);
+
 module.exports = router;

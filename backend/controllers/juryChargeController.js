@@ -1,4 +1,4 @@
-const db = require("../config/db");
+const { poolPromise } = require("../config/db");
 const sql = require("mssql");
 
 // Save jury charge questions for a case (Attorney only)
@@ -8,8 +8,10 @@ exports.saveJuryChargeQuestions = async (req, res) => {
     const { questions } = req.body; // Array of {questionText, questionType, options}
     const attorneyId = req.user.id;
 
+    const pool = await poolPromise;
+
     // Verify attorney owns this case
-    const caseResult = await db
+    const caseResult = await pool
       .request()
       .input("caseId", sql.Int, caseId)
       .input("attorneyId", sql.Int, attorneyId)
@@ -18,16 +20,14 @@ exports.saveJuryChargeQuestions = async (req, res) => {
       );
 
     if (caseResult.recordset.length === 0) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Not authorized to modify this case",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to modify this case",
+      });
     }
 
     // Delete existing questions for this case
-    await db
+    await pool
       .request()
       .input("caseId", sql.Int, caseId)
       .query("DELETE FROM JuryChargeQuestions WHERE CaseId = @caseId");
@@ -43,7 +43,7 @@ exports.saveJuryChargeQuestions = async (req, res) => {
           optionsJson = JSON.stringify(question.options);
         }
 
-        await db
+        await pool
           .request()
           .input("caseId", sql.Int, caseId)
           .input("questionText", sql.NVarChar, question.questionText)
@@ -62,12 +62,10 @@ exports.saveJuryChargeQuestions = async (req, res) => {
     });
   } catch (error) {
     console.error("Error saving jury charge questions:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to save jury charge questions",
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to save jury charge questions",
+    });
   }
 };
 
@@ -76,7 +74,9 @@ exports.getJuryChargeQuestions = async (req, res) => {
   try {
     const { caseId } = req.params;
 
-    const result = await db
+    const pool = await poolPromise;
+
+    const result = await pool
       .request()
       .input("caseId", sql.Int, caseId)
       .query(
@@ -98,12 +98,11 @@ exports.getJuryChargeQuestions = async (req, res) => {
     res.json({ success: true, questions });
   } catch (error) {
     console.error("Error fetching jury charge questions:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to fetch jury charge questions",
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch jury charge questions",
+      error: error.message,
+    });
   }
 };
 
@@ -114,8 +113,10 @@ exports.updateJuryChargeQuestion = async (req, res) => {
     const { questionText, questionType, options } = req.body;
     const attorneyId = req.user.id;
 
+    const pool = await poolPromise;
+
     // Verify attorney owns the case this question belongs to
-    const verifyResult = await db
+    const verifyResult = await pool
       .request()
       .input("questionId", sql.Int, questionId)
       .input("attorneyId", sql.Int, attorneyId).query(`
@@ -138,7 +139,7 @@ exports.updateJuryChargeQuestion = async (req, res) => {
     }
 
     // Update question
-    await db
+    await pool
       .request()
       .input("questionId", sql.Int, questionId)
       .input("questionText", sql.NVarChar, questionText)
@@ -164,8 +165,10 @@ exports.deleteJuryChargeQuestion = async (req, res) => {
     const { questionId } = req.params;
     const attorneyId = req.user.id;
 
+    const pool = await poolPromise;
+
     // Verify attorney owns the case this question belongs to
-    const verifyResult = await db
+    const verifyResult = await pool
       .request()
       .input("questionId", sql.Int, questionId)
       .input("attorneyId", sql.Int, attorneyId).query(`
@@ -182,7 +185,7 @@ exports.deleteJuryChargeQuestion = async (req, res) => {
     }
 
     // Delete question
-    await db
+    await pool
       .request()
       .input("questionId", sql.Int, questionId)
       .query("DELETE FROM JuryChargeQuestions WHERE QuestionId = @questionId");
@@ -201,7 +204,9 @@ exports.exportAsText = async (req, res) => {
   try {
     const { caseId } = req.params;
 
-    const result = await db
+    const pool = await poolPromise;
+
+    const result = await pool
       .request()
       .input("caseId", sql.Int, caseId)
       .query(
@@ -249,7 +254,9 @@ exports.exportAsMSFormsTemplate = async (req, res) => {
   try {
     const { caseId } = req.params;
 
-    const result = await db
+    const pool = await poolPromise;
+
+    const result = await pool
       .request()
       .input("caseId", sql.Int, caseId)
       .query(

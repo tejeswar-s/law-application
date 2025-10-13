@@ -1,4 +1,4 @@
-const db = require("../config/db");
+const { poolPromise } = require("../config/db");
 const sql = require("mssql");
 
 // Add or update witnesses for a case (Attorney only)
@@ -8,8 +8,10 @@ exports.saveWitnesses = async (req, res) => {
     const { witnesses } = req.body; // Array of {name, side, description}
     const attorneyId = req.user.id;
 
+    const pool = await poolPromise;
+
     // Verify attorney owns this case
-    const caseResult = await db
+    const caseResult = await pool
       .request()
       .input("caseId", sql.Int, caseId)
       .input("attorneyId", sql.Int, attorneyId)
@@ -18,16 +20,14 @@ exports.saveWitnesses = async (req, res) => {
       );
 
     if (caseResult.recordset.length === 0) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Not authorized to modify this case",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to modify this case",
+      });
     }
 
     // Delete existing witnesses for this case
-    await db
+    await pool
       .request()
       .input("caseId", sql.Int, caseId)
       .query("DELETE FROM CaseWitnesses WHERE CaseId = @caseId");
@@ -36,7 +36,7 @@ exports.saveWitnesses = async (req, res) => {
     if (witnesses && witnesses.length > 0) {
       for (let i = 0; i < witnesses.length; i++) {
         const witness = witnesses[i];
-        await db
+        await pool
           .request()
           .input("caseId", sql.Int, caseId)
           .input("witnessName", sql.NVarChar, witness.name)
@@ -63,7 +63,9 @@ exports.getWitnesses = async (req, res) => {
   try {
     const { caseId } = req.params;
 
-    const result = await db
+    const pool = await poolPromise;
+
+    const result = await pool
       .request()
       .input("caseId", sql.Int, caseId)
       .query(
@@ -75,7 +77,11 @@ exports.getWitnesses = async (req, res) => {
     console.error("Error fetching witnesses:", error);
     res
       .status(500)
-      .json({ success: false, message: "Failed to fetch witnesses" });
+      .json({
+        success: false,
+        message: "Failed to fetch witnesses",
+        error: error.message,
+      });
   }
 };
 
@@ -86,8 +92,10 @@ exports.updateWitness = async (req, res) => {
     const { name, side, description } = req.body;
     const attorneyId = req.user.id;
 
+    const pool = await poolPromise;
+
     // Verify attorney owns the case this witness belongs to
-    const verifyResult = await db
+    const verifyResult = await pool
       .request()
       .input("witnessId", sql.Int, witnessId)
       .input("attorneyId", sql.Int, attorneyId).query(`
@@ -104,7 +112,7 @@ exports.updateWitness = async (req, res) => {
     }
 
     // Update witness
-    await db
+    await pool
       .request()
       .input("witnessId", sql.Int, witnessId)
       .input("name", sql.NVarChar, name)
@@ -130,8 +138,10 @@ exports.deleteWitness = async (req, res) => {
     const { witnessId } = req.params;
     const attorneyId = req.user.id;
 
+    const pool = await poolPromise;
+
     // Verify attorney owns the case this witness belongs to
-    const verifyResult = await db
+    const verifyResult = await pool
       .request()
       .input("witnessId", sql.Int, witnessId)
       .input("attorneyId", sql.Int, attorneyId).query(`
@@ -148,7 +158,7 @@ exports.deleteWitness = async (req, res) => {
     }
 
     // Delete witness
-    await db
+    await pool
       .request()
       .input("witnessId", sql.Int, witnessId)
       .query("DELETE FROM CaseWitnesses WHERE WitnessId = @witnessId");
@@ -159,5 +169,49 @@ exports.deleteWitness = async (req, res) => {
     res
       .status(500)
       .json({ success: false, message: "Failed to delete witness" });
+  }
+};
+
+// Export witnesses as text file format (Admin)
+exports.exportAsText = async (req, res) => {
+  try {
+    const { caseId } = req.params;
+
+    const pool = await poolPromise;
+
+    const result = await pool
+      .request()
+      .input("caseId", sql.Int, caseId)
+      .query(
+        "SELECT * FROM CaseWitnesses WHERE CaseId = @caseId ORDER BY OrderIndex ASC"
+      );
+
+    let textContent = "WITNESSES FOR CREDIBILITY EVALUATION\n";
+    textContent += "=====================================\n\n";
+
+    if (result.recordset.length === 0) {
+      textContent += "No witnesses have been added for this case.\n";
+    } else {
+      result.recordset.forEach((witness, index) => {
+        textContent += `Witness ${index + 1}: ${witness.WitnessName}\n`;
+        textContent += `Side: ${witness.Side}\n`;
+        if (witness.Description) {
+          textContent += `Description: ${witness.Description}\n`;
+        }
+        textContent += "\n---\n\n";
+      });
+    }
+
+    res.setHeader("Content-Type", "text/plain");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="witnesses-case-${caseId}.txt"`
+    );
+    res.send(textContent);
+  } catch (error) {
+    console.error("Error exporting witnesses:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to export witnesses" });
   }
 };

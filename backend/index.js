@@ -96,24 +96,6 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
-// API Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/attorney", attorneyRoutes);
-app.use("/api/juror", jurorRoutes);
-app.use("/api", require("./routes/caseRoutes"));
-app.use("/api", scheduleTrialRoutes);
-app.use("/api", warRoomTeamRoutes);
-app.use("/api", warRoomDocumentRoutes);
-app.use("/api", warRoomVoirDireRoutes);
-app.use("/api", warRoomInfoRoutes);
-app.use("/api", fileRoutes);
-app.use("/api", notificationRoutes);
-app.use("/api/admin/calendar", adminCalendarRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/cases", witnessRoutes);
-app.use("/api/cases", juryChargeRoutes);
-app.use("/api/trial", trialRoutes);
-
 // Test route for database connection
 app.get("/api/test-db", async (req, res) => {
   try {
@@ -154,7 +136,36 @@ app.get("/api/test-dump", async (req, res) => {
   }
 });
 
-// 404 handler for API routes
+// ============================================
+// API ROUTES - ORDER MATTERS!
+// Most specific routes FIRST, catch-all routes LAST
+// ============================================
+
+// 1. MOST SPECIFIC ROUTES FIRST (more path segments)
+app.use("/api/admin/calendar", adminCalendarRoutes);
+
+// 2. SPECIFIC ROUTES
+app.use("/api/admin", adminRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/attorney", attorneyRoutes);
+app.use("/api/juror", jurorRoutes);
+app.use("/api/trial", trialRoutes);
+
+// 3. WITNESS AND JURY CHARGE ROUTES (must come before catch-all /api routes)
+app.use("/api/cases", witnessRoutes);
+app.use("/api/cases", juryChargeRoutes);
+
+// 4. CATCH-ALL /api ROUTES (these match everything under /api, so they go LAST)
+app.use("/api", require("./routes/caseRoutes"));
+app.use("/api", scheduleTrialRoutes);
+app.use("/api", warRoomTeamRoutes);
+app.use("/api", warRoomDocumentRoutes);
+app.use("/api", warRoomVoirDireRoutes);
+app.use("/api", warRoomInfoRoutes);
+app.use("/api", fileRoutes);
+app.use("/api", notificationRoutes);
+
+// 404 handler for API routes (must be AFTER all route definitions)
 app.use("/api", (req, res) => {
   res.status(404).json({
     error: "API endpoint not found",
