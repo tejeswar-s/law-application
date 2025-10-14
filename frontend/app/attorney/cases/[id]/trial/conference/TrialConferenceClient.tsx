@@ -8,6 +8,7 @@ import {
   LocalVideoStream,
 } from "@azure/communication-calling";
 import { AzureCommunicationTokenCredential } from "@azure/communication-common";
+import { ChatClient } from "@azure/communication-chat";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL
   ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, "")
@@ -28,7 +29,7 @@ export default function TrialConferenceClient() {
   const [call, setCall] = useState<any>(null);
   const [callState, setCallState] = useState("Initializing...");
   const [participants, setParticipants] = useState<any[]>([]);
-  const [featuredParticipant, setFeaturedParticipant] = useState<string | null>(null);
+  const [featuredParticipant, setFeaturedParticipant] = useState<string>("local");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
@@ -37,6 +38,22 @@ export default function TrialConferenceClient() {
   const [displayName, setDisplayName] = useState("You");
   const [renderTrigger, setRenderTrigger] = useState(0);
 
+  // Chat states
+  const [chatClient, setChatClient] = useState<any>(null);
+  const [chatThread, setChatThread] = useState<any>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [showChatNotification, setShowChatNotification] = useState(false);
+  const [latestMessage, setLatestMessage] = useState<any>(null);
+
+  // Panel states
+  const [showChatPanel, setShowChatPanel] = useState(false);
+  const [showParticipantsPanel, setShowParticipantsPanel] = useState(false);
+
+  // Participant join times
+  const [participantJoinTimes, setParticipantJoinTimes] = useState<Map<string, Date>>(new Map());
+
   const featuredVideoRef = useRef<HTMLDivElement>(null);
   const localThumbnailRef = useRef<HTMLDivElement>(null);
   const localVideoStream = useRef<any>(null);
@@ -44,6 +61,8 @@ export default function TrialConferenceClient() {
   const localThumbnailRenderer = useRef<any>(null);
   const remoteVideoRefs = useRef<Map<string, any>>(new Map());
   const hasInitialized = useRef(false);
+  const chatMessagesEndRef = useRef<HTMLDivElement>(null);
+  const currentUserId = useRef<string>("");
 
   useEffect(() => {
     if (hasInitialized.current) return;
@@ -58,7 +77,6 @@ export default function TrialConferenceClient() {
       if (localThumbnailRenderer.current) localThumbnailRenderer.current.dispose();
       remoteVideoRefs.current.forEach((r) => r.renderer?.dispose());
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function renderLocalVideo() {
@@ -88,8 +106,59 @@ export default function TrialConferenceClient() {
 
   useEffect(() => {
     renderLocalVideo();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [featuredParticipant, renderTrigger]);
+
+  useEffect(() => {
+    if (chatMessagesEndRef.current) {
+      chatMessagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
+
+  async function initializeChat(token: string, userId: string, threadId: string, endpoint: string) {
+  try {
+    console.log("Initializing chat with endpoint:", endpoint);
+    
+    const tokenCredential = new AzureCommunicationTokenCredential(token);
+    const client = new ChatClient(endpoint, tokenCredential);
+    
+    setChatClient(client);
+    const thread = client.getChatThreadClient(threadId);
+    setChatThread(thread);
+    currentUserId.current = userId;
+
+    // Listen for new messages
+    await client.startRealtimeNotifications();
+    
+    client.on("chatMessageReceived", (e: any) => {
+      if (e.sender.communicationUserId !== currentUserId.current) {
+        const newMsg = {
+          id: e.id,
+          content: e.message,
+          sender: e.senderDisplayName || "Unknown",
+          senderId: e.sender.communicationUserId,
+          timestamp: new Date(e.createdOn),
+        };
+        
+        setMessages(prev => [...prev, newMsg]);
+        
+        if (!showChatPanel) {
+          setUnreadCount(prev => prev + 1);
+          setLatestMessage(newMsg);
+          setShowChatNotification(true);
+          setTimeout(() => setShowChatNotification(false), 5000);
+        }
+      }
+    });
+
+    console.log("Chat initialized successfully!");
+    
+    // DON'T try to load existing messages - causes 403 error
+    // Users will automatically be added as participants when they send first message
+    
+  } catch (err) {
+    console.error("Chat initialization error:", err);
+  }
+}
 
   async function initializeCall() {
     try {
@@ -107,6 +176,12 @@ export default function TrialConferenceClient() {
       if (!response.ok) throw new Error("Failed to join trial");
       const data = await response.json();
       setDisplayName(data.displayName);
+
+      // Initialize chat (you'll need to get threadId from backend)
+      // Initialize chat (you'll need to get threadId from backend)
+if (data.chatThreadId && data.endpointUrl) {
+  await initializeChat(data.token, data.userId, data.chatThreadId, data.endpointUrl);
+}
 
       setCallState("Initializing devices...");
 
@@ -137,6 +212,9 @@ export default function TrialConferenceClient() {
 
       setCall(roomCall);
 
+      // Track local join time
+      setParticipantJoinTimes(prev => new Map(prev).set("local", new Date()));
+
       roomCall.on("stateChanged", async () => {
         setCallState(roomCall.state);
         if (roomCall.state === "Connected") {
@@ -151,9 +229,10 @@ export default function TrialConferenceClient() {
 
       roomCall.on("remoteParticipantsUpdated", async (e: any) => {
         for (const participant of e.added) {
-          participant.on("videoStreamsUpdated", async (ev: any) => {
-            const userId = participant.identifier.communicationUserId;
+          const userId = participant.identifier.communicationUserId;
+          setParticipantJoinTimes(prev => new Map(prev).set(userId, new Date()));
 
+          participant.on("videoStreamsUpdated", async (ev: any) => {
             for (const stream of ev.removed) {
               const streamKey = stream.mediaStreamType === 'ScreenSharing' 
                 ? `${userId}-screen`
@@ -195,10 +274,9 @@ export default function TrialConferenceClient() {
 
                   setRenderTrigger(prev => prev + 1);
 
+                  // Auto-switch to screen share
                   if (stream.mediaStreamType === 'ScreenSharing') {
                     setFeaturedParticipant(streamKey);
-                  } else if (!featuredParticipant && roomCall.remoteParticipants.length === 1) {
-                    setFeaturedParticipant(userId);
                   }
                 } catch (err) {
                   console.error("Remote video error:", err);
@@ -214,7 +292,6 @@ export default function TrialConferenceClient() {
               try {
                 const renderer = new VideoStreamRenderer(stream);
                 const view = await renderer.createView();
-                const userId = participant.identifier.communicationUserId;
                 
                 const streamKey = stream.mediaStreamType === 'ScreenSharing' 
                   ? `${userId}-screen`
@@ -230,6 +307,7 @@ export default function TrialConferenceClient() {
                 
                 setRenderTrigger(prev => prev + 1);
                 
+                // Auto-switch to screen share
                 if (stream.mediaStreamType === 'ScreenSharing') {
                   setFeaturedParticipant(streamKey);
                 }
@@ -254,9 +332,16 @@ export default function TrialConferenceClient() {
             remoteVideoRefs.current.delete(`${userId}-screen`);
           }
           
+          // If featured participant left, switch back to local
           if (featuredParticipant === userId || featuredParticipant === `${userId}-screen`) {
-            setFeaturedParticipant(null);
+            setFeaturedParticipant("local");
           }
+
+          setParticipantJoinTimes(prev => {
+            const updated = new Map(prev);
+            updated.delete(userId);
+            return updated;
+          });
         }
 
         setParticipants([...roomCall.remoteParticipants]);
@@ -268,6 +353,43 @@ export default function TrialConferenceClient() {
       setLoading(false);
     }
   }
+
+  const sendMessage = async () => {
+    if (!chatThread || !newMessage.trim()) return;
+
+    try {
+      await chatThread.sendMessage({ content: newMessage });
+      
+      const msg = {
+        id: Date.now().toString(),
+        content: newMessage,
+        sender: displayName,
+        senderId: currentUserId.current,
+        timestamp: new Date(),
+      };
+      
+      setMessages(prev => [...prev, msg]);
+      setNewMessage("");
+    } catch (err) {
+      console.error("Send message error:", err);
+    }
+  };
+
+  const toggleChatPanel = () => {
+    setShowChatPanel(!showChatPanel);
+    if (!showChatPanel) {
+      setUnreadCount(0);
+      setShowChatNotification(false);
+      if (showParticipantsPanel) setShowParticipantsPanel(false);
+    }
+  };
+
+  const toggleParticipantsPanel = () => {
+    setShowParticipantsPanel(!showParticipantsPanel);
+    if (!showParticipantsPanel && showChatPanel) {
+      setShowChatPanel(false);
+    }
+  };
 
   const toggleMute = async () => {
     if (!call) return;
@@ -304,42 +426,36 @@ export default function TrialConferenceClient() {
       if (isScreenSharing) {
         await call.stopScreenSharing();
         setIsScreenSharing(false);
-        if (participants.length > 0) {
-          setFeaturedParticipant(participants[0].identifier.communicationUserId);
-        } else {
-          setFeaturedParticipant("local");
-        }
+        setFeaturedParticipant("local");
       } else {
         try {
           await call.startScreenSharing();
           setIsScreenSharing(true);
-          
-          setTimeout(() => {
-            const screenShareStreams = call.localVideoStreams.filter(
-              (stream: any) => stream.mediaStreamType === 'ScreenSharing'
-            );
-            
-            if (screenShareStreams.length > 0) {
-              console.log("Screen share started successfully");
-            }
-          }, 1000);
-          
         } catch (permError) {
           console.error("Screen share permission error:", permError);
           setIsScreenSharing(false);
-          alert("Screen sharing failed. Please ensure:\n1. You grant screen sharing permission\n2. You're not selecting a tab that's already in the call\n3. Your browser supports screen sharing");
+          alert("Screen sharing failed. Please ensure you grant permission.");
         }
       }
     } catch (err: any) {
       console.error("Screen share error:", err);
       setIsScreenSharing(false);
-      alert("Screen sharing failed. Try sharing an application window instead of entire screen.");
     }
   };
 
   const leaveCall = async () => {
     if (call) await call.hangUp();
+    if (chatClient) await chatClient.stopRealtimeNotifications();
     router.push("/attorney");
+  };
+
+  const formatTime = (date: Date) => {
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diff < 60) return "Just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   if (loading) {
@@ -375,6 +491,21 @@ export default function TrialConferenceClient() {
       ? remoteVideoRefs.current.get(featuredParticipant)
       : null;
 
+  const allParticipants = [
+    { 
+      id: "local", 
+      displayName: displayName, 
+      isLocal: true,
+      joinTime: participantJoinTimes.get("local")
+    },
+    ...participants.map((p: any) => ({
+      id: p.identifier.communicationUserId,
+      displayName: p.displayName || "Participant",
+      isLocal: false,
+      joinTime: participantJoinTimes.get(p.identifier.communicationUserId)
+    }))
+  ];
+
   return (
     <div className="h-screen bg-[#E8E5DD] flex overflow-hidden">
       {/* Sidebar */}
@@ -402,7 +533,7 @@ export default function TrialConferenceClient() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col justify-between p-6 overflow-hidden">
-        {/* Featured Video with Border (reduced height to fit single view) */}
+        {/* Featured Video */}
         <div className="flex justify-center items-center h-[60vh] mb-4">
           <div className="w-full max-w-5xl h-full bg-white border-4 border-[#0078D4] rounded-lg shadow-xl overflow-hidden relative">
             <div className="w-full h-full">
@@ -441,7 +572,6 @@ export default function TrialConferenceClient() {
                         ref={featuredVideoRef}
                         className="flex items-center justify-center w-full h-full bg-black"
                       >
-                        {/* Centered smaller local view container */}
                         <div className="w-[40%] max-w-[480px] aspect-video rounded-xl overflow-hidden shadow-lg border-2 border-gray-700">
                           <div className="[&_video]:object-cover [&_video]:rounded-xl w-full h-full" />
                         </div>
@@ -462,7 +592,7 @@ export default function TrialConferenceClient() {
           </div>
         </div>
 
-        {/* Participant Thumbnails - shortened height to fit */}
+        {/* Participant Thumbnails */}
         <div className="flex gap-4 justify-center h-[14vh] items-center overflow-x-auto">
           <button
             onClick={() => setFeaturedParticipant("local")}
@@ -527,7 +657,7 @@ export default function TrialConferenceClient() {
             })}
         </div>
 
-        {/* Control Bar - reduced height */}
+        {/* Control Bar */}
         <div className="bg-white rounded-lg shadow-lg px-6 py-3 flex items-center justify-center gap-6 h-[10vh]">
           <button
             onClick={toggleMute}
@@ -571,13 +701,37 @@ export default function TrialConferenceClient() {
             <span className="text-xs text-gray-700">Share screen</span>
           </button>
 
-          <button className="flex flex-col items-center gap-1 hover:opacity-70 transition">
-            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-              <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <button 
+            onClick={toggleParticipantsPanel}
+            className="flex flex-col items-center gap-1 hover:opacity-70 transition relative"
+          >
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+              showParticipantsPanel ? "bg-blue-100" : "bg-gray-100"
+            }`}>
+              <svg className={`w-6 h-6 ${showParticipantsPanel ? "text-blue-600" : "text-gray-700"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             </div>
             <span className="text-xs text-gray-700">Participants</span>
+          </button>
+
+          <button 
+            onClick={toggleChatPanel}
+            className="flex flex-col items-center gap-1 hover:opacity-70 transition relative"
+          >
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+              showChatPanel ? "bg-blue-100" : "bg-gray-100"
+            }`}>
+              <svg className={`w-6 h-6 ${showChatPanel ? "text-blue-600" : "text-gray-700"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </div>
+            {unreadCount > 0 && (
+              <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                {unreadCount}
+              </div>
+            )}
+            <span className="text-xs text-gray-700">Chat</span>
           </button>
 
           <button
@@ -593,6 +747,117 @@ export default function TrialConferenceClient() {
           </button>
         </div>
       </div>
+
+      {/* Right Side Panels */}
+      {/* Participants Panel */}
+      {showParticipantsPanel && (
+        <div className="w-80 bg-white border-l border-gray-200 flex flex-col">
+          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Participants ({allParticipants.length})
+            </h3>
+            <button onClick={toggleParticipantsPanel} className="text-gray-500 hover:text-gray-700">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            {allParticipants.map((participant) => (
+              <div key={participant.id} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg mb-2">
+                <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
+                  {participant.displayName.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">
+                    {participant.displayName} {participant.isLocal && "(You)"}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Joined {participant.joinTime ? formatTime(participant.joinTime) : "Unknown"}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Chat Panel */}
+      {showChatPanel && (
+        <div className="w-80 bg-white border-l border-gray-200 flex flex-col">
+          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">Chat</h3>
+            <button onClick={toggleChatPanel} className="text-gray-500 hover:text-gray-700">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {messages.map((msg) => (
+              <div key={msg.id} className={`flex ${msg.senderId === currentUserId.current ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[80%] ${msg.senderId === currentUserId.current ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-900'} rounded-lg p-3`}>
+                  <div className="text-xs font-semibold mb-1">{msg.sender}</div>
+                  <div className="text-sm">{msg.content}</div>
+                  <div className="text-xs opacity-70 mt-1">{formatTime(msg.timestamp)}</div>
+                </div>
+              </div>
+            ))}
+            <div ref={chatMessagesEndRef} />
+          </div>
+
+          <div className="p-4 border-t border-gray-200">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                placeholder="Type a message..."
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={sendMessage}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Chat Notification Popup */}
+      {showChatNotification && latestMessage && !showChatPanel && (
+        <div 
+          onClick={toggleChatPanel}
+          className="fixed bottom-24 right-6 w-80 bg-white border border-gray-200 rounded-lg shadow-2xl p-4 cursor-pointer hover:shadow-xl transition-shadow animate-slide-up"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0">
+              {latestMessage.sender.charAt(0).toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-gray-900 text-sm">{latestMessage.sender}</div>
+              <div className="text-sm text-gray-700 truncate">{latestMessage.content}</div>
+            </div>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowChatNotification(false);
+              }}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
