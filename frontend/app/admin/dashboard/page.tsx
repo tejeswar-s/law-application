@@ -454,6 +454,62 @@ export default function AdminDashboard() {
       </main>
     );
   }
+
+  const handleDownloadWitnesses = async (caseId: number) => {
+    try {
+      const response = await fetch(`${API_BASE}/api/cases/${caseId}/witnesses/export/text`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `witnesses-case-${caseId}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading witnesses:', error);
+      alert('Failed to download witnesses');
+    }
+  };
+
+  const handleDownloadJuryQuestionsText = async (caseId: number) => {
+    try {
+      const response = await fetch(`${API_BASE}/api/cases/${caseId}/jury-charge/export/text`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `jury-charge-case-${caseId}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading jury questions:', error);
+      alert('Failed to download jury questions');
+    }
+  };
+
+  const handleDownloadJuryQuestionsMSForms = async (caseId: number) => {
+    try {
+      const response = await fetch(`${API_BASE}/api/cases/${caseId}/jury-charge/export/ms-forms`);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ms-forms-template-case-${caseId}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading MS Forms template:', error);
+      alert('Failed to download MS Forms template');
+    }
+  };
+
+
   
   return (
     <main className="min-h-screen w-full" style={{ backgroundColor: BG }}>
@@ -984,9 +1040,18 @@ export default function AdminDashboard() {
 
               {/* Witnesses */}
               <div>
-                <div className="flex items-center mb-3">
-                  <UserIcon className="h-5 w-5 mr-2 text-purple-600" />
-                  <h3 className="font-semibold text-gray-900">Witnesses ({selectedCase.witnesses.length})</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center">
+                    <UserIcon className="h-5 w-5 mr-2 text-purple-600" />
+                    <h3 className="font-semibold text-gray-900">Witnesses ({selectedCase.witnesses.length})</h3>
+                  </div>
+                  <button
+                    onClick={() => handleDownloadWitnesses(selectedCase.CaseId)}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download (Text)
+                  </button>
                 </div>
                 {selectedCase.witnesses.length === 0 ? (
                   <p className="text-gray-500 text-sm">No witnesses added</p>
@@ -1013,9 +1078,27 @@ export default function AdminDashboard() {
 
               {/* Jury Questions */}
               <div>
-                <div className="flex items-center mb-3">
-                  <FileText className="h-5 w-5 mr-2 text-green-600" />
-                  <h3 className="font-semibold text-gray-900">Jury Charge Questions ({selectedCase.juryQuestions.length})</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center">
+                    <FileText className="h-5 w-5 mr-2 text-green-600" />
+                    <h3 className="font-semibold text-gray-900">Jury Charge Questions ({selectedCase.juryQuestions.length})</h3>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleDownloadJuryQuestionsText(selectedCase.CaseId)}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
+                    >
+                      <Download className="h-4 w-4" />
+                      Download (Text)
+                    </button>
+                    <button
+                      onClick={() => handleDownloadJuryQuestionsMSForms(selectedCase.CaseId)}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                    >
+                      <Download className="h-4 w-4" />
+                      MS Forms
+                    </button>
+                  </div>
                 </div>
                 {selectedCase.juryQuestions.length === 0 ? (
                   <p className="text-gray-500 text-sm">No jury questions added</p>

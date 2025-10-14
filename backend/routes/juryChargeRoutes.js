@@ -7,6 +7,26 @@ const {
   requireAdmin,
 } = require("../middleware/authMiddleware");
 
+// IMPORTANT: Export routes MUST come BEFORE the general /:caseId/jury-charge route
+
+// Export routes - NO AUTH (so admin dashboard can download without login)
+router.get(
+  "/:caseId/jury-charge/export/text",
+  juryChargeController.exportAsText
+);
+
+router.get(
+  "/:caseId/jury-charge/export/ms-forms",
+  juryChargeController.exportAsMSFormsTemplate
+);
+
+// Get questions (accessible by attorney and admin)
+router.get(
+  "/:caseId/jury-charge",
+  authMiddleware,
+  juryChargeController.getJuryChargeQuestions
+);
+
 // Attorney routes (protected)
 router.post(
   "/:caseId/jury-charge",
@@ -27,25 +47,6 @@ router.delete(
   authMiddleware,
   requireAttorney,
   juryChargeController.deleteJuryChargeQuestion
-);
-
-// Get questions (accessible by attorney and admin)
-router.get(
-  "/:caseId/jury-charge",
-  authMiddleware,
-  juryChargeController.getJuryChargeQuestions
-);
-
-// Export routes (Admin)
-router.get(
-  "/:caseId/jury-charge/export/text",
-  authMiddleware,
-  juryChargeController.exportAsText
-);
-router.get(
-  "/:caseId/jury-charge/export/ms-forms",
-  authMiddleware,
-  juryChargeController.exportAsMSFormsTemplate
 );
 
 module.exports = router;
