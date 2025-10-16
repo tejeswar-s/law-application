@@ -201,6 +201,7 @@ router.post("/jobs/:jobId/apply", requireJurorOnboarding, async (req, res) => {
 });
 
 // Get available cases for juror (job board)
+// Get available cases for juror (job board)
 router.get("/cases/available", requireJurorOnboarding, async (req, res) => {
   try {
     const juror = req.user;
@@ -210,10 +211,9 @@ router.get("/cases/available", requireJurorOnboarding, async (req, res) => {
 
     const Case = require("../models/Case");
 
-    const availableCases = await Case.getAvailableCasesForJuror(
-      juror.state,
-      juror.county
-    );
+    // FIXED: Changed function name from getAvailableCasesForJuror to getAvailableCasesForJurors (plural)
+    // FIXED: Pass only county parameter as per Case model function signature
+    const availableCases = await Case.getAvailableCasesForJurors(juror.county);
 
     console.log("Cases found:", availableCases.length);
 

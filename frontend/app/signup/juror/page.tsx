@@ -34,9 +34,7 @@ const stepLabels = [
 
 function JurorSignupInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { state, actions } = useSignupForm('juror');
-  const emailVerificationHandled = useRef(false);
   
   // Location data
   const [availableStates, setAvailableStates] = useState<LocationOption[]>([]);
@@ -116,20 +114,6 @@ function JurorSignupInner() {
     fetchCities();
   }, [formData.stateCode]);
 
-  // Handle email verification redirect - FIXED to prevent infinite loops
-  useEffect(() => {
-    const verifyToken = searchParams.get("verifyToken");
-    
-    if (verifyToken && !emailVerificationHandled.current) {
-      emailVerificationHandled.current = true;
-      console.log("Email verification token detected, processing...");
-      
-      // Simply go to step 4 - the form data should already be loaded by useSignupForm
-      actions.setStep(4);
-      actions.setAuthSubStep(1);
-    }
-  }, [searchParams]); // REMOVED actions from dependencies
-
   const handleNext = async () => {
     actions.setError(null);
     let validation;
@@ -159,10 +143,10 @@ function JurorSignupInner() {
             actions.setValidationErrors(validation.errors);
             return;
           }
-          // Send verification email
+          // Send OTP
           try {
             actions.setLoading(true);
-            const res = await fetch(`${API_BASE}/api/auth/juror/send-email-verification`, {
+            const res = await fetch(`${API_BASE}/api/auth/juror/send-otp`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ email: formData.email }),
@@ -170,7 +154,7 @@ function JurorSignupInner() {
             
             if (!res.ok) {
               const data = await res.json();
-              actions.setError(data.message || "Failed to send verification email");
+              actions.setError(data.message || "Failed to send verification code");
               return;
             }
             
@@ -182,132 +166,113 @@ function JurorSignupInner() {
             actions.setLoading(false);
           }
           return;
+        } else {
+          // authSubStep 2 - OTP verification handled in Step3 component
+          // Once verified, it will call onNext which brings us to step 4
+          actions.setStep(4);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
+        }
+      case 4:
+        validation = validateWithSchema(jurorStep4Schema, formData);
+        if (!validation.isValid || !state.hasScrolledToBottom) {
+          const errors = { ...validation.errors };
+          if (!state.hasScrolledToBottom) {
+            errors.scroll = "Please scroll to the bottom to read the complete agreement";
+          }
+          actions.setValidationErrors(errors);
+          return;
+        }
+        
+        // Check if email was verified
+        if (!formData.emailVerified) {
+          actions.setError("Email verification is required. Please go back to Step 3.");
+          return;
+        }
+        
+        // Final submission
+        try {
+          actions.setLoading(true);
+          
+          console.log("Final submission attempt with form data");
+          
+          // Validate all required fields are present
+          const requiredChecks = [
+            { field: 'name', value: formData.personalDetails2?.name, step: 2 },
+            { field: 'phone', value: formData.personalDetails2?.phone, step: 2 },
+            { field: 'address', value: formData.personalDetails2?.address1, step: 2 },
+            { field: 'state', value: formData.personalDetails2?.state, step: 2 },
+            { field: 'county', value: formData.personalDetails2?.county, step: 2 },
+            { field: 'city', value: formData.personalDetails2?.city, step: 2 },
+            { field: 'zip', value: formData.personalDetails2?.zip, step: 2 },
+            { field: 'paymentMethod', value: formData.paymentMethod, step: 2 },
+            { field: 'email', value: formData.email, step: 3 },
+            { field: 'password', value: formData.password, step: 3 },
+          ];
+
+          for (const check of requiredChecks) {
+            if (!check.value || (typeof check.value === 'string' && !check.value.trim())) {
+              actions.setError(`${check.field} is missing. Please go back to Step ${check.step} and complete your information.`);
+              return;
+            }
+          }
+          
+          const submitData = {
+            criteriaResponses: JSON.stringify(formData.criteriaAnswers),
+            name: formData.personalDetails2.name.trim(),
+            phoneNumber: formData.personalDetails2.phone.trim(),
+            address1: formData.personalDetails2.address1.trim(),
+            address2: formData.personalDetails2.address2?.trim() || "",
+            city: formData.personalDetails2.city.trim(),
+            cityCode: formData.cityCode || "",
+            state: formData.personalDetails2.state.trim(),
+            stateCode: formData.stateCode || "",
+            zipCode: formData.personalDetails2.zip.trim(),
+            county: formData.personalDetails2.county.trim(),
+            countyCode: formData.countyCode || "",
+            
+            // Optional demographics
+            maritalStatus: formData.personalDetails1.maritalStatus?.trim() || "",
+            spouseEmployer: formData.personalDetails1.spouseEmployer?.trim() || "",
+            employerName: formData.personalDetails1.employerName?.trim() || "",
+            employerAddress: formData.personalDetails1.employerAddress?.trim() || "",
+            yearsInCounty: formData.personalDetails1.yearsInCounty || "",
+            ageRange: formData.personalDetails1.ageRange || "",
+            gender: formData.personalDetails1.gender || "",
+            education: formData.personalDetails1.education || "",
+            
+            // Required fields
+            paymentMethod: formData.paymentMethod,
+            email: formData.email.trim(),
+            password: formData.password,
+            userAgreementAccepted: formData.userAgreementAccepted
+          };
+          
+          const res = await fetch(`${API_BASE}/api/auth/juror/signup`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(submitData),
+          });
+          
+          if (!res.ok) {
+            const data = await res.json();
+            console.error("Signup error response:", data);
+            actions.setError(data.message || "Signup failed");
+            return;
+          }
+          
+          // Success - clear sensitive data and go to success page
+          actions.clearSensitiveData();
+          actions.setStep(5);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          
+        } catch (err) {
+          console.error("Juror signup network error:", err);
+          actions.setError("Network error");
+        } finally {
+          actions.setLoading(false);
         }
         return;
-      case 4:
-  validation = validateWithSchema(jurorStep4Schema, formData);
-  if (!validation.isValid || !state.hasScrolledToBottom) {
-    const errors = { ...validation.errors };
-    if (!state.hasScrolledToBottom) {
-      errors.scroll = "Please scroll to the bottom to read the complete agreement";
-    }
-    actions.setValidationErrors(errors);
-    return;
-  }
-  
-  // Final submission - FIXED
-  try {
-    actions.setLoading(true);
-    
-    console.log("Final submission attempt with form data:", {
-      hasName: !!formData.personalDetails2?.name,
-      hasEmail: !!formData.email,
-      hasPassword: !!formData.password,
-      hasPhone: !!formData.personalDetails2?.phone,
-      hasPaymentMethod: !!formData.paymentMethod,
-      step: state.step,
-      authSubStep: state.authSubStep
-    });
-    
-    // Validate all required fields are present
-    if (!formData.personalDetails2?.name?.trim()) {
-      actions.setError("Name is missing. Please go back to Step 2 and complete your information.");
-      return;
-    }
-    if (!formData.personalDetails2?.phone?.trim()) {
-      actions.setError("Phone number is missing. Please go back to Step 2 and complete your information.");
-      return;
-    }
-    if (!formData.personalDetails2?.address1?.trim()) {
-      actions.setError("Address is missing. Please go back to Step 2 and complete your information.");
-      return;
-    }
-    if (!formData.personalDetails2?.state?.trim()) {
-      actions.setError("State is missing. Please go back to Step 2 and complete your information.");
-      return;
-    }
-    if (!formData.personalDetails2?.county?.trim()) {
-      actions.setError("County is missing. Please go back to Step 2 and complete your information.");
-      return;
-    }
-    if (!formData.personalDetails2?.city?.trim()) {
-      actions.setError("City is missing. Please go back to Step 2 and complete your information.");
-      return;
-    }
-    if (!formData.personalDetails2?.zip?.trim()) {
-      actions.setError("ZIP Code is missing. Please go back to Step 2 and complete your information.");
-      return;
-    }
-    if (!formData.paymentMethod) {
-      actions.setError("Payment method is missing. Please go back to Step 2 and select a payment method.");
-      return;
-    }
-    if (!formData.email?.trim()) {
-      actions.setError("Email is missing. Please go back to Step 3 and enter your email.");
-      return;
-    }
-    if (!formData.password?.trim()) {
-      actions.setError("Password is missing. Please go back to Step 3 and enter your password.");
-      return;
-    }
-    
-    const submitData = {
-      criteriaResponses: JSON.stringify(formData.criteriaAnswers),
-      name: formData.personalDetails2.name.trim(),
-      phoneNumber: formData.personalDetails2.phone.trim(),
-      address1: formData.personalDetails2.address1.trim(),
-      address2: formData.personalDetails2.address2?.trim() || "",
-      city: formData.personalDetails2.city.trim(),
-      cityCode: formData.cityCode || "",
-      state: formData.personalDetails2.state.trim(),
-      stateCode: formData.stateCode || "",
-      zipCode: formData.personalDetails2.zip.trim(),
-      county: formData.personalDetails2.county.trim(),
-      countyCode: formData.countyCode || "",
-      
-      // Optional demographics
-      maritalStatus: formData.personalDetails1.maritalStatus?.trim() || "",
-      spouseEmployer: formData.personalDetails1.spouseEmployer?.trim() || "",
-      employerName: formData.personalDetails1.employerName?.trim() || "",
-      employerAddress: formData.personalDetails1.employerAddress?.trim() || "",
-      yearsInCounty: formData.personalDetails1.yearsInCounty || "",
-      ageRange: formData.personalDetails1.ageRange || "",
-      gender: formData.personalDetails1.gender || "",
-      education: formData.personalDetails1.education || "",
-      
-      // Required fields
-      paymentMethod: formData.paymentMethod,
-      email: formData.email.trim(),
-      password: formData.password, // Now available!
-      userAgreementAccepted: formData.userAgreementAccepted
-    };
-    
-    console.log("Submitting with password present:", !!submitData.password);
-    
-    const res = await fetch(`${API_BASE}/api/auth/juror/signup`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(submitData),
-    });
-    
-    if (!res.ok) {
-      const data = await res.json();
-      console.error("Signup error response:", data);
-      actions.setError(data.message || "Signup failed");
-      return;
-    }
-    
-    // Success - NOW clear sensitive data
-    actions.clearSensitiveData();
-    actions.setStep(5);
-    
-  } catch (err) {
-    console.error("Juror signup network error:", err);
-    actions.setError("Network error");
-  } finally {
-    actions.setLoading(false);
-  }
-  return;
     }
 
     if (!validation?.isValid) {
@@ -326,6 +291,12 @@ function JurorSignupInner() {
   const handleBack = () => {
     if (state.step === 2 && state.personalSubStep === 2) {
       actions.setPersonalSubStep(1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    if (state.step === 3 && state.authSubStep === 2) {
+      actions.setAuthSubStep(1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
     if (state.step === 1) {
@@ -334,26 +305,16 @@ function JurorSignupInner() {
     }
     actions.setStep((Math.max(state.step - 1, 1)) as any);
     actions.setPersonalSubStep(1);
+    actions.setAuthSubStep(1);
     actions.setValidationErrors({});
-  };
-
-  const handleResendEmail = async () => {
-    try {
-      await fetch(`${API_BASE}/api/auth/juror/send-email-verification`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: formData.email }),
-      });
-    } catch (err) {
-      actions.setError("Network error. Please try again.");
-    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const getSidebarContent = () => {
     const titles = {
       1: "Criteria Verification",
-      2: state.personalSubStep === 1 ? "Personal Details (1/2)" : "Personal Details (2/2)",
-      3: "Email & Password Set Up",
+      2: state.personalSubStep === 1 ? "Demographic Information" : "Contact Information",
+      3: state.authSubStep === 1 ? "Email & Password Set Up" : "Email Verification",
       4: "User Agreement",
       5: "Sign Up Complete"
     };
@@ -361,9 +322,11 @@ function JurorSignupInner() {
     const descriptions = {
       1: "Please answer all questions honestly. Your responses help determine eligibility for jury service.",
       2: state.personalSubStep === 1 
-        ? "Please provide your demographic information. All fields on this page are optional."
+        ? "Help us understand your background better. All fields on this page are required."
         : "Please fill out the following fields with necessary information. Any field with * is required.",
-      3: "Create your login information to access the platform. Your password must meet all listed requirements.",
+      3: state.authSubStep === 1
+        ? "Create your login information to access the platform. Your password must meet all listed requirements."
+        : "Enter the 6-digit verification code sent to your email to confirm your account.",
       4: "Please read and agree to the terms outlined below to complete your registration.",
       5: "Welcome to Quick Verdicts! Your account has been created successfully."
     };
@@ -418,7 +381,6 @@ function JurorSignupInner() {
           authSubStep={state.authSubStep}
           onNext={handleNext}
           loading={state.loading}
-          onResendEmail={handleResendEmail}
         />
       )}
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import WitnessSection from "./components/WitnessSection";
 import JuryChargeSection from "./components/JuryChargeSection";
-import { CheckCircleIcon, ExclamationCircleIcon } from "@heroicons/react/24/outline";
+import { CheckCircleIcon, ExclamationCircleIcon, XMarkIcon, PlusIcon, DocumentArrowUpIcon } from "@heroicons/react/24/outline";
 
 type TeamMember = { 
   Name: string; 
@@ -17,6 +17,13 @@ type Document = {
   FileName: string;
   Description: string;
   FileUrl: string;
+};
+
+type FileToUpload = {
+  file: File;
+  description: string;
+  progress: number;
+  id: string;
 };
 
 type Application = {
@@ -37,12 +44,13 @@ type CaseData = {
   DefendantGroups: string;
   CaseTier?: string;
   AttorneyStatus?: string;
+  CaseTitle?: string;
 };
 
 function getFirstName(groups: string, key: "plaintiffs" | "defendants") {
   try {
     const arr = JSON.parse(groups);
-    return arr[0]?.[key]?.[0]?.Name || "";
+    return arr[0]?.[key]?.[0]?.name || "";
   } catch {
     return "";
   }
@@ -68,11 +76,12 @@ export default function WarRoomPage() {
   const [showAddTeam, setShowAddTeam] = useState(false);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [newMembers, setNewMembers] = useState<TeamMember[]>([{ Name: "", Role: "", Email: "" }]);
+  
+  // Multiple file upload states
   const [showAddDocument, setShowAddDocument] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [description, setDescription] = useState("");
+  const [filesToUpload, setFilesToUpload] = useState<FileToUpload[]>([]);
   const [documentation, setDocumentation] = useState<Document[]>([]);
-  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [uploadingDocuments, setUploadingDocuments] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteDoc, setDeleteDoc] = useState<Document | null>(null);
   const [deletingDocument, setDeletingDocument] = useState(false);
@@ -151,23 +160,51 @@ export default function WarRoomPage() {
     setTeamMembers(data || []);
   }
 
-  async function uploadDocument(caseId: string, file: File, description: string) {
-    const token = getCookie("token");
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("description", description);
-
-    await fetch(`${API_BASE}/api/cases/${caseId}/documents`, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${token}` },
-      body: formData,
-    });
+  async function uploadDocuments() {
+    if (filesToUpload.length === 0) return;
     
-    const res = await fetch(`${API_BASE}/api/cases/${caseId}/documents`, {
-      headers: { "Authorization": `Bearer ${token}` }
-    });
-    const data = await res.json();
-    setDocumentation(data || []);
+    setUploadingDocuments(true);
+    const token = getCookie("token");
+
+    try {
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const fileData = filesToUpload[i];
+        const formData = new FormData();
+        formData.append("file", fileData.file);
+        formData.append("description", fileData.description);
+
+        // Simulate progress (in real app, use XHR with progress events)
+        setFilesToUpload(prev => prev.map((f, idx) => 
+          idx === i ? { ...f, progress: 50 } : f
+        ));
+
+        await fetch(`${API_BASE}/api/cases/${caseId}/documents`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${token}` },
+          body: formData,
+        });
+
+        setFilesToUpload(prev => prev.map((f, idx) => 
+          idx === i ? { ...f, progress: 100 } : f
+        ));
+      }
+
+      // Refresh documentation list
+      const res = await fetch(`${API_BASE}/api/cases/${caseId}/documents`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setDocumentation(data || []);
+
+      // Close modal and reset
+      setShowAddDocument(false);
+      setFilesToUpload([]);
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert("Failed to upload some documents");
+    } finally {
+      setUploadingDocuments(false);
+    }
   }
 
   async function deleteDocument(caseId: string, docId: number) {
@@ -257,16 +294,35 @@ export default function WarRoomPage() {
   const pendingCount = applications.filter(app => app.Status === "pending").length;
   const canSubmit = approvedCount >= 2 && caseData?.AttorneyStatus === "war_room";
 
+  const handleBackToCases = () => {
+    router.push("/attorney");
+    // After navigation, the attorney dashboard will show cases section
+    setTimeout(() => {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('navigate-to-cases'));
+      }
+    }, 100);
+  };
+
+  const getCaseName = () => {
+    if (caseData?.CaseTitle) {
+      return caseData.CaseTitle;
+    }
+    const plaintiff = getFirstName(caseData?.PlaintiffGroups || "", "plaintiffs");
+    const defendant = getFirstName(caseData?.DefendantGroups || "", "defendants");
+    return `${plaintiff} v. ${defendant}`;
+  };
+
   return (
     <div className="flex min-h-screen bg-[#F7F6F3]">
       <AttorneySidebar 
         selectedSection={"cases"} 
         onSectionChange={(section) => {
           if (section === "home") router.push("/attorney");
-          if (section === "profile") router.push("/attorney"); // Will switch to profile
-          if (section === "cases") router.push("/attorney"); // Will switch to cases
-          if (section === "calendar") router.push("/attorney"); // Will switch to calendar
-          if (section === "notifications") router.push("/attorney"); // Will switch to notifications
+          if (section === "profile") router.push("/attorney");
+          if (section === "cases") router.push("/attorney");
+          if (section === "calendar") router.push("/attorney");
+          if (section === "notifications") router.push("/attorney");
         }} 
       />
       <div className="flex-1 relative">
@@ -302,8 +358,8 @@ export default function WarRoomPage() {
 
               <div className="flex justify-between items-start mb-2">
                 <button
-                  className="text-[#16305B] underline text-sm font-medium"
-                  onClick={() => router.push("/attorney")}
+                  className="text-[#16305B] underline text-sm font-medium hover:text-[#1e417a]"
+                  onClick={handleBackToCases}
                 >
                   &lt; Back to Cases
                 </button>
@@ -331,7 +387,7 @@ export default function WarRoomPage() {
               </div>
 
               <h1 className="text-2xl font-bold mt-2 mb-1 text-[#363636]">
-                {getFirstName(caseData.PlaintiffGroups, "plaintiffs")} v. {getFirstName(caseData.DefendantGroups, "defendants")} War Room
+                {getCaseName()} War Room
               </h1>
               <div className="text-[#363636] font-semibold mb-2">Case # {caseData.Id}</div>
 
@@ -502,225 +558,379 @@ export default function WarRoomPage() {
           )}
         </div>
 
-        {/* Modals - keeping existing modals code... */}
+        {/* FIXED: Modals now positioned relative to viewport */}
         {(showAddTeam || showAddDocument || showDeleteModal || showApplicationModal) && (
-          <div className="absolute inset-0 backdrop-blur-[2px] flex items-center justify-center z-50">
-            {/* Application Modal */}
-            {showApplicationModal && selectedApplication && (
-              <div className="bg-white rounded shadow-lg border border-gray-200 p-6 w-[600px] max-h-[80vh] overflow-y-auto">
-                <h2 className="text-xl font-bold mb-4 text-[#16305B]">Application Details</h2>
-                
-                <div className="mb-4 p-4 bg-gray-50 rounded">
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div><span className="font-semibold">Name:</span> {selectedApplication.JurorName}</div>
-                    <div><span className="font-semibold">Email:</span> {selectedApplication.JurorEmail}</div>
-                    <div><span className="font-semibold">County:</span> {selectedApplication.County}</div>
-                    <div><span className="font-semibold">Status:</span> 
-                      <span className={`ml-2 px-2 py-1 rounded text-xs font-semibold ${
-                        selectedApplication.Status === "approved" ? "bg-green-100 text-green-700" :
-                        selectedApplication.Status === "rejected" ? "bg-red-100 text-red-700" :
-                        "bg-yellow-100 text-yellow-700"
-                      }`}>
-                        {selectedApplication.Status.charAt(0).toUpperCase() + selectedApplication.Status.slice(1)}
-                      </span>
+          <div 
+  className="fixed inset-0 flex items-center justify-center z-50 p-4"
+  style={{
+    backgroundColor: 'rgba(150, 150, 150, 0.2)',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)'
+  }}
+>
+            <div className="max-h-[90vh] overflow-y-auto">
+              {/* Application Modal */}
+              {showApplicationModal && selectedApplication && (
+                <div className="bg-white rounded-xl shadow-2xl border border-gray-200 p-6 w-full max-w-2xl">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-[#16305B]">Application Details</h2>
+                    <button
+                      onClick={() => {
+                        setShowApplicationModal(false);
+                        setSelectedApplication(null);
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <XMarkIcon className="w-6 h-6" />
+                    </button>
+                  </div>
+                  
+                  <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div><span className="font-semibold">Name:</span> {selectedApplication.JurorName}</div>
+                      <div><span className="font-semibold">Email:</span> {selectedApplication.JurorEmail}</div>
+                      <div><span className="font-semibold">County:</span> {selectedApplication.County}</div>
+                      <div><span className="font-semibold">Status:</span> 
+                        <span className={`ml-2 px-2 py-1 rounded text-xs font-semibold ${
+                          selectedApplication.Status === "approved" ? "bg-green-100 text-green-700" :
+                          selectedApplication.Status === "rejected" ? "bg-red-100 text-red-700" :
+                          "bg-yellow-100 text-yellow-700"
+                        }`}>
+                          {selectedApplication.Status.charAt(0).toUpperCase() + selectedApplication.Status.slice(1)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="mb-4">
-                  <h3 className="font-bold text-[#16305B] mb-2">Part 1: Standard Questions</h3>
-                  <div className="space-y-3">
-                    {JSON.parse(selectedApplication.VoirDire1Responses).map((item: any, idx: number) => (
-                      <div key={idx} className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm font-semibold text-gray-700 mb-1">{idx + 1}. {item.question}</div>
-                        <div className="text-sm text-gray-600">Answer: <span className="font-semibold">{item.answer}</span></div>
+                  <div className="mb-4">
+                    <h3 className="font-bold text-[#16305B] mb-2">Part 1: Standard Questions</h3>
+                    <div className="space-y-3">
+                      {JSON.parse(selectedApplication.VoirDire1Responses).map((item: any, idx: number) => (
+                        <div key={idx} className="p-3 bg-gray-50 rounded-lg">
+                          <div className="text-sm font-semibold text-gray-700 mb-1">{idx + 1}. {item.question}</div>
+                          <div className="text-sm text-gray-600">Answer: <span className="font-semibold">{item.answer}</span></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mb-4">
+                    <h3 className="font-bold text-[#16305B] mb-2">Part 2: Case-Specific Questions</h3>
+                    <div className="space-y-3">
+                      {JSON.parse(selectedApplication.VoirDire2Responses).map((item: any, idx: number) => (
+                        <div key={idx} className="p-3 bg-gray-50 rounded-lg">
+                          <div className="text-sm font-semibold text-gray-700 mb-1">{idx + 1}. {item.question}</div>
+                          <div className="text-sm text-gray-600">Answer: <span className="font-semibold">{item.answer}</span></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 mt-6">
+                    {selectedApplication.Status === "pending" && (
+                      <>
+                        <button
+                          className="flex-1 bg-green-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors shadow-sm"
+                          onClick={() => updateApplicationStatus(selectedApplication.ApplicationId, "approved")}
+                          disabled={updatingStatus}
+                        >
+                          {updatingStatus ? "Updating..." : "Approve"}
+                        </button>
+                        <button
+                          className="flex-1 bg-red-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-red-700 disabled:opacity-50 transition-colors shadow-sm"
+                          onClick={() => updateApplicationStatus(selectedApplication.ApplicationId, "rejected")}
+                          disabled={updatingStatus}
+                        >
+                          {updatingStatus ? "Updating..." : "Reject"}
+                        </button>
+                      </>
+                    )}
+                    <button
+                      className="px-6 py-2.5 bg-gray-200 text-[#16305B] rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+                      onClick={() => {
+                        setShowApplicationModal(false);
+                        setSelectedApplication(null);
+                      }}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Team Modal - IMPROVED */}
+              {showAddTeam && (
+                <div className="bg-white rounded-xl shadow-2xl border border-gray-200 p-6 w-full max-w-md">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-[#16305B]">Add Team Member</h2>
+                    <button
+                      onClick={() => setShowAddTeam(false)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <XMarkIcon className="w-6 h-6" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4 mb-6">
+                    {newMembers.map((member, idx) => (
+                      <div key={idx} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Name <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Enter full name"
+                              className="border border-gray-300 px-3 py-2 rounded-lg w-full text-[#16305B] bg-white focus:outline-none focus:ring-2 focus:ring-[#16305B] focus:border-transparent"
+                              value={member.Name}
+                              onChange={e => {
+                                const arr = [...newMembers];
+                                arr[idx].Name = e.target.value;
+                                setNewMembers(arr);
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Role <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="e.g., Paralegal, Associate"
+                              className="border border-gray-300 px-3 py-2 rounded-lg w-full text-[#16305B] bg-white focus:outline-none focus:ring-2 focus:ring-[#16305B] focus:border-transparent"
+                              value={member.Role}
+                              onChange={e => {
+                                const arr = [...newMembers];
+                                arr[idx].Role = e.target.value;
+                                setNewMembers(arr);
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Email <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="email"
+                              placeholder="email@example.com"
+                              className="border border-gray-300 px-3 py-2 rounded-lg w-full text-[#16305B] bg-white focus:outline-none focus:ring-2 focus:ring-[#16305B] focus:border-transparent"
+                              value={member.Email}
+                              onChange={e => {
+                                const arr = [...newMembers];
+                                arr[idx].Email = e.target.value;
+                                setNewMembers(arr);
+                              }}
+                            />
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
-                </div>
 
-                <div className="mb-4">
-                  <h3 className="font-bold text-[#16305B] mb-2">Part 2: Case-Specific Questions</h3>
-                  <div className="space-y-3">
-                    {JSON.parse(selectedApplication.VoirDire2Responses).map((item: any, idx: number) => (
-                      <div key={idx} className="p-3 bg-gray-50 rounded">
-                        <div className="text-sm font-semibold text-gray-700 mb-1">{idx + 1}. {item.question}</div>
-                        <div className="text-sm text-gray-600">Answer: <span className="font-semibold">{item.answer}</span></div>
-                      </div>
-                    ))}
+                  <div className="flex gap-3">
+                    <button
+                      className="flex-1 bg-[#16305B] text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-[#1e417a] transition-colors shadow-sm"
+                      onClick={async () => {
+                        const isValid = newMembers.every(m => m.Name && m.Role && m.Email);
+                        if (!isValid) {
+                          alert("Please fill all fields");
+                          return;
+                        }
+                        await addTeamMembers(caseId, newMembers);
+                        setShowAddTeam(false);
+                        setNewMembers([{ Name: "", Role: "", Email: "" }]);
+                      }}
+                    >
+                      Add Member
+                    </button>
+                    <button
+                      className="px-6 py-2.5 bg-gray-200 text-[#16305B] rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+                      onClick={() => setShowAddTeam(false)}
+                    >
+                      Cancel
+                    </button>
                   </div>
                 </div>
+              )}
 
-                <div className="flex gap-2 mt-6">
-                  {selectedApplication.Status === "pending" && (
-                    <>
-                      <button
-                        className="flex-1 bg-green-600 text-white px-4 py-2 rounded font-semibold hover:bg-green-700 disabled:opacity-50"
-                        onClick={() => updateApplicationStatus(selectedApplication.ApplicationId, "approved")}
-                        disabled={updatingStatus}
-                      >
-                        {updatingStatus ? "Updating..." : "Approve"}
-                      </button>
-                      <button
-                        className="flex-1 bg-red-600 text-white px-4 py-2 rounded font-semibold hover:bg-red-700 disabled:opacity-50"
-                        onClick={() => updateApplicationStatus(selectedApplication.ApplicationId, "rejected")}
-                        disabled={updatingStatus}
-                      >
-                        {updatingStatus ? "Updating..." : "Reject"}
-                      </button>
-                    </>
-                  )}
-                  <button
-                    className="px-4 py-2 bg-gray-300 text-[#16305B] rounded font-semibold"
-                    onClick={() => {
-                      setShowApplicationModal(false);
-                      setSelectedApplication(null);
-                    }}
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Team Modal */}
-            {showAddTeam && (
-              <div className="bg-white rounded shadow-lg border border-gray-200 p-6 w-[350px]">
-                <h2 className="text-lg font-bold mb-4 text-[#16305B]">Add Team Member</h2>
-                {newMembers.map((member, idx) => (
-                  <div key={idx} className="mb-2">
-                    <input
-                      type="text"
-                      placeholder="Name"
-                      className="border px-2 py-1 rounded w-full mb-2 text-[#16305B] bg-white"
-                      value={member.Name}
-                      onChange={e => {
-                        const arr = [...newMembers];
-                        arr[idx].Name = e.target.value;
-                        setNewMembers(arr);
-                      }}
-                    />
-                    <input
-                      type="text"
-                      placeholder="Role"
-                      className="border px-2 py-1 rounded w-full mb-2 text-[#16305B] bg-white"
-                      value={member.Role}
-                      onChange={e => {
-                        const arr = [...newMembers];
-                        arr[idx].Role = e.target.value;
-                        setNewMembers(arr);
-                      }}
-                    />
-                    <input
-                      type="email"
-                      placeholder="Email"
-                      className="border px-2 py-1 rounded w-full text-[#16305B] bg-white"
-                      value={member.Email}
-                      onChange={e => {
-                        const arr = [...newMembers];
-                        arr[idx].Email = e.target.value;
-                        setNewMembers(arr);
-                      }}
-                    />
-                  </div>
-                ))}
-                <div className="flex gap-2 mt-4">
-                  <button
-                    className="bg-[#16305B] text-white px-4 py-2 rounded font-semibold"
-                    onClick={async () => {
-                      await addTeamMembers(caseId, newMembers);
-                      setShowAddTeam(false);
-                      setNewMembers([{ Name: "", Role: "", Email: "" }]);
-                    }}
-                  >
-                    Add
-                  </button>
-                  <button
-                    className="bg-gray-300 text-[#16305B] px-4 py-2 rounded font-semibold"
-                    onClick={() => setShowAddTeam(false)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Document Modal */}
-            {showAddDocument && (
-              <div className="bg-white rounded shadow-lg border border-gray-200 p-6 w-[350px]">
-                <h2 className="text-lg font-bold mb-4 text-[#16305B]">Add Document</h2>
-                <input
-                  type="file"
-                  className="mb-2 text-[#16305B] bg-white font-medium"
-                  onChange={e => setFile(e.target.files?.[0] || null)}
-                />
-                <input
-                  type="text"
-                  placeholder="Description"
-                  className="border px-2 py-1 rounded w-full mb-2 text-[#16305B] bg-white"
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                />
-                <div className="flex gap-2 mt-4">
-                  <button
-                    className="bg-[#16305B] text-white px-4 py-2 rounded font-semibold"
-                    onClick={async () => {
-                      if (file) {
-                        setUploadingDocument(true);
-                        await uploadDocument(caseId, file, description);
-                        setUploadingDocument(false);
+              {/* Document Modal - IMPROVED WITH MULTIPLE UPLOADS */}
+              {showAddDocument && (
+                <div className="bg-white rounded-xl shadow-2xl border border-gray-200 p-6 w-full max-w-2xl">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-[#16305B]">Upload Documents</h2>
+                    <button
+                      onClick={() => {
                         setShowAddDocument(false);
-                        setFile(null);
-                        setDescription("");
-                      }
-                    }}
-                  >
-                    {uploadingDocument ? "Uploading..." : "Add"}
-                  </button>
-                  <button
-                    className="bg-gray-300 text-[#16305B] px-4 py-2 rounded font-semibold"
-                    onClick={() => setShowAddDocument(false)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
+                        setFilesToUpload([]);
+                      }}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <XMarkIcon className="w-6 h-6" />
+                    </button>
+                  </div>
 
-            {/* Delete Modal */}
-            {showDeleteModal && (
-              <div className="bg-white rounded shadow-lg border border-gray-200 p-6 w-[350px]">
-                <h2 className="text-lg font-bold mb-4 text-black">Delete Document</h2>
-                <p className="text-black">Are you sure you want to delete <strong>{deleteDoc?.FileName}</strong>?</p>
-                <div className="flex gap-2 mt-4">
-                  <button
-                    className="bg-[#B10000] text-white px-4 py-2 rounded"
-                    onClick={async () => {
-                      if (!deleteDoc) return;
-                      try {
-                        setDeletingDocument(true);
-                        await deleteDocument(caseId, deleteDoc.Id);
-                        setDocumentation(prev => prev.filter(doc => doc.Id !== deleteDoc.Id));
-                      } catch (err) {
-                        console.error("Delete failed:", err);
-                      } finally {
-                        setDeletingDocument(false);
+                  {/* File Input Area */}
+                  <div className="mb-4">
+                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <DocumentArrowUpIcon className="w-10 h-10 text-gray-400 mb-2" />
+                        <p className="text-sm text-gray-600 font-medium">Click to upload documents</p>
+                        <p className="text-xs text-gray-500">or drag and drop files here</p>
+                      </div>
+                      <input
+                        type="file"
+                        className="hidden"
+                        multiple
+                        onChange={e => {
+                          const files = Array.from(e.target.files || []);
+                          const newFiles = files.map(file => ({
+                            file,
+                            description: "",
+                            progress: 0,
+                            id: Math.random().toString(36)
+                          }));
+                          setFilesToUpload(prev => [...prev, ...newFiles]);
+                        }}
+                      />
+                    </label>
+                  </div>
+
+                  {/* Files List */}
+                  {filesToUpload.length > 0 && (
+                    <div className="mb-4 space-y-3 max-h-96 overflow-y-auto">
+                      {filesToUpload.map((fileData, idx) => (
+                        <div key={fileData.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900 text-sm">{fileData.file.name}</p>
+                              <p className="text-xs text-gray-500">{(fileData.file.size / 1024).toFixed(2)} KB</p>
+                            </div>
+                            <button
+                              onClick={() => setFilesToUpload(prev => prev.filter((_, i) => i !== idx))}
+                              className="text-red-500 hover:text-red-700"
+                              title="Remove file"
+                            >
+                              <XMarkIcon className="w-5 h-5" />
+                            </button>
+                          </div>
+                          
+                          <input
+                            type="text"
+                            placeholder="Add description (optional)"
+                            className="border border-gray-300 px-3 py-2 rounded-lg w-full text-sm text-[#16305B] bg-white focus:outline-none focus:ring-2 focus:ring-[#16305B]"
+                            value={fileData.description}
+                            onChange={e => {
+                              const arr = [...filesToUpload];
+                              arr[idx].description = e.target.value;
+                              setFilesToUpload(arr);
+                            }}
+                          />
+
+                          {/* Progress Bar */}
+                          {fileData.progress > 0 && (
+                            <div className="mt-2">
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div 
+                                  className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                                  style={{ width: `${fileData.progress}%` }}
+                                />
+                              </div>
+                              <p className="text-xs text-gray-600 mt-1">{fileData.progress}% uploaded</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Overall Progress */}
+                  {uploadingDocuments && (
+                    <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="flex items-center gap-2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#16305B]"></div>
+                        <p className="text-sm font-medium text-blue-900">
+                          Uploading {filesToUpload.filter(f => f.progress === 100).length} of {filesToUpload.length} files...
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3">
+                    <button
+                      className="flex-1 bg-[#16305B] text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-[#1e417a] transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={uploadDocuments}
+                      disabled={filesToUpload.length === 0 || uploadingDocuments}
+                    >
+                      {uploadingDocuments ? "Uploading..." : `Upload ${filesToUpload.length} Document${filesToUpload.length !== 1 ? 's' : ''}`}
+                    </button>
+                    <button
+                      className="px-6 py-2.5 bg-gray-200 text-[#16305B] rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+                      onClick={() => {
+                        setShowAddDocument(false);
+                        setFilesToUpload([]);
+                      }}
+                      disabled={uploadingDocuments}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Delete Modal */}
+              {showDeleteModal && deleteDoc && (
+                <div className="bg-white rounded-xl shadow-2xl border border-gray-200 p-6 w-full max-w-md">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-[#16305B]">Delete Document</h2>
+                    <button
+                      onClick={() => setShowDeleteModal(false)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <XMarkIcon className="w-6 h-6" />
+                    </button>
+                  </div>
+                  
+                  <p className="text-gray-700 mb-6">
+                    Are you sure you want to delete <strong className="text-gray-900">{deleteDoc.FileName}</strong>? This action cannot be undone.
+                  </p>
+                  
+                  <div className="flex gap-3">
+                    <button
+                      className="flex-1 bg-red-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-red-700 transition-colors shadow-sm disabled:opacity-50"
+                      onClick={async () => {
+                        if (!deleteDoc) return;
+                        try {
+                          setDeletingDocument(true);
+                          await deleteDocument(caseId, deleteDoc.Id);
+                          setDocumentation(prev => prev.filter(doc => doc.Id !== deleteDoc.Id));
+                          setShowDeleteModal(false);
+                          setDeleteDoc(null);
+                        } catch (err) {
+                          console.error("Delete failed:", err);
+                          alert("Failed to delete document");
+                        } finally {
+                          setDeletingDocument(false);
+                        }
+                      }}
+                      disabled={deletingDocument}
+                    >
+                      {deletingDocument ? "Deleting..." : "Delete"}
+                    </button>
+                    <button
+                      className="px-6 py-2.5 bg-gray-200 text-[#16305B] rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+                      onClick={() => {
                         setShowDeleteModal(false);
                         setDeleteDoc(null);
-                      }
-                    }}
-                  >
-                    {deletingDocument ? "Deleting..." : "Delete"}
-                  </button>
-                  <button
-                    className="bg-gray-300 px-4 py-2 rounded"
-                    onClick={() => setShowDeleteModal(false)}
-                  >
-                    Cancel
-                  </button>
+                      }}
+                      disabled={deletingDocument}
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
       </div>

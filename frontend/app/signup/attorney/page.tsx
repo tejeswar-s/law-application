@@ -36,7 +36,6 @@ function AttorneySignupInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { state, actions } = useSignupForm('attorney');
-  const emailVerificationHandled = useRef(false);
   
   // Location data
   const [availableStates, setAvailableStates] = useState<LocationOption[]>([]);
@@ -116,26 +115,11 @@ function AttorneySignupInner() {
     fetchCities();
   }, [formData.stateCode]);
 
-  // Handle email verification redirect - SAME AS JUROR
-  useEffect(() => {
-    const verifyToken = searchParams.get("verifyToken");
-    
-    if (verifyToken && !emailVerificationHandled.current) {
-      emailVerificationHandled.current = true;
-      console.log("Attorney email verification token detected, processing...");
-      
-      // Store the verification token and go to step 4
-      actions.updateFormData({ verificationToken: verifyToken });
-      actions.setStep(4);
-      actions.setAuthSubStep(1);
-    }
-  }, [searchParams]);
-
   const handleNext = async () => {
     actions.setError(null);
     let validation;
 
-    console.log("Attorney HandleNext called for step:", state.step);
+    console.log("Attorney HandleNext called for step:", state.step, "substep:", state.authSubStep);
 
     switch (state.step) {
       case 1:
@@ -145,17 +129,18 @@ function AttorneySignupInner() {
         validation = validateWithSchema(attorneyStep2Schema, formData);
         break;
       case 3:
-        // NEW: Email verification flow like juror
+        // NEW: OTP verification flow
         if (state.authSubStep === 1) {
+          // Sub-step 1: Email & Password form
           validation = validateWithSchema(attorneyStep3Schema, formData);
           if (!validation.isValid) {
             actions.setValidationErrors(validation.errors);
             return;
           }
-          // Send verification email
+          // Send OTP email
           try {
             actions.setLoading(true);
-            const res = await fetch(`${API_BASE}/api/auth/attorney/send-email-verification`, {
+            const res = await fetch(`${API_BASE}/api/auth/attorney/send-otp`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ email: formData.email }),
@@ -169,11 +154,47 @@ function AttorneySignupInner() {
             
             if (!res.ok) {
               const data = await res.json();
-              actions.setError(data.message || "Failed to send verification email");
+              actions.setError(data.message || "Failed to send verification code");
               return;
             }
             
+            // Move to OTP input screen
             actions.setAuthSubStep(2);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } catch (err) {
+            actions.setError("Network error. Please try again.");
+          } finally {
+            actions.setLoading(false);
+          }
+          return;
+        } else if (state.authSubStep === 2) {
+          // Sub-step 2: OTP verification
+          if (!formData.otp || formData.otp.length !== 6) {
+            actions.setValidationErrors({ otp: "Please enter the 6-digit code" });
+            return;
+          }
+          
+          try {
+            actions.setLoading(true);
+            const res = await fetch(`${API_BASE}/api/auth/attorney/verify-otp`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ 
+                email: formData.email,
+                otp: formData.otp 
+              }),
+            });
+            
+            if (!res.ok) {
+              const data = await res.json();
+              actions.setValidationErrors({ otp: data.message || "Invalid verification code" });
+              return;
+            }
+            
+            // OTP verified - mark as verified and move to next step
+            actions.updateFormData({ emailVerified: true });
+            actions.setStep(4);
+            actions.setAuthSubStep(1);
             window.scrollTo({ top: 0, behavior: 'smooth' });
           } catch (err) {
             actions.setError("Network error. Please try again.");
@@ -194,13 +215,13 @@ function AttorneySignupInner() {
           return;
         }
 
-        // Final submission - IMPROVED with verification token
+        // Final submission
         try {
           actions.setLoading(true);
           
-          // Check for verification token
-          if (!formData.verificationToken) {
-            actions.setError("Email verification is required. Please check your email and click the verification link.");
+          // Check for email verification
+          if (!formData.emailVerified) {
+            actions.setError("Email verification is required. Please complete email verification first.");
             return;
           }
 
@@ -228,11 +249,10 @@ function AttorneySignupInner() {
           const submitData = {
             ...formData,
             addressState: formData.state,
-            // Make sure verification token is included
-            verificationToken: formData.verificationToken,
+            emailVerified: true,
           };
           
-          console.log("Attorney submitting with verification token:", !!submitData.verificationToken);
+          console.log("Attorney submitting with emailVerified:", submitData.emailVerified);
           
           const res = await fetch(`${API_BASE}/api/auth/attorney/signup`, {
             method: "POST",
@@ -273,6 +293,14 @@ function AttorneySignupInner() {
   };
 
   const handleBack = () => {
+    if (state.step === 3 && state.authSubStep === 2) {
+      // Go back from OTP screen to email/password screen
+      actions.setAuthSubStep(1);
+      actions.setError(null);
+      actions.setValidationErrors({});
+      return;
+    }
+    
     if (state.step === 1) {
       router.push("/signup");
       return;
@@ -281,15 +309,25 @@ function AttorneySignupInner() {
     actions.setValidationErrors({});
   };
 
-  const handleResendEmail = async () => {
+  const handleResendOTP = async () => {
     try {
-      await fetch(`${API_BASE}/api/auth/attorney/send-email-verification`, {
+      actions.setLoading(true);
+      const res = await fetch(`${API_BASE}/api/auth/attorney/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: formData.email }),
       });
+      
+      if (res.ok) {
+        actions.setError("Verification code resent to your email");
+        setTimeout(() => actions.setError(null), 3000);
+      } else {
+        actions.setError("Failed to resend code. Please try again.");
+      }
     } catch (err) {
       actions.setError("Network error. Please try again.");
+    } finally {
+      actions.setLoading(false);
     }
   };
 
@@ -297,7 +335,7 @@ function AttorneySignupInner() {
     const titles = {
       1: "Sign Up: Attorney",
       2: "Sign Up: Attorney", 
-      3: "Email & Password Set Up",
+      3: state.authSubStep === 1 ? "Email & Password Set Up" : "Verify Your Email",
       4: "User Agreement",
       5: "Sign Up Complete"
     };
@@ -307,7 +345,7 @@ function AttorneySignupInner() {
       2: "Please fill out the following fields with the necessary information. Any field with * is required, and the same goes for the registered address.",
       3: state.authSubStep === 1 
         ? "Please fill out the following fields with the necessary information. Your password must meet the listed minimum requirements."
-        : "We sent a verification link to your email. Please check your inbox and click the link to continue.",
+        : "We sent a 6-digit verification code to your email. Please enter the code below to verify your email address.",
       4: "Please read the user agreement and agree to sign up and create an account on Quick Verdict.",
       5: "Welcome to Quick Verdicts! Your account has been created successfully. Please note: you will have limited functionalities until your bar license has been verified."
     };
@@ -361,7 +399,8 @@ function AttorneySignupInner() {
           authSubStep={state.authSubStep}
           onNext={handleNext}
           loading={state.loading}
-          onResendEmail={handleResendEmail}
+          onResendOTP={handleResendOTP}
+          error={state.error}
         />
       )}
 

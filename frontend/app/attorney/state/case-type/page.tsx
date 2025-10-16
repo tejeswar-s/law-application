@@ -2,12 +2,32 @@
 // app/attorney/case-type/page.tsx
 "use client";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 
 export default function CaseTypePage() {
   const router = useRouter();
   const [selected, setSelected] = useState("");
+
+  // Clear all previous case data when this page loads
+  useEffect(() => {
+    const keysToRemove = [
+      "caseTypeSelection",
+      "state",
+      "county",
+      "caseType",
+      "caseTier",
+      "caseDescription",
+      "plaintiffGroups",
+      "defendantGroups",
+      "voirDire2Questions",
+      "paymentMethod",
+      "paymentAmount",
+    ];
+    
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    console.log("✅ Previous case data cleared");
+  }, []);
 
   const handleSelect = (type: string) => {
     setSelected(type);
@@ -18,7 +38,7 @@ export default function CaseTypePage() {
   };
 
   const handleBack = () => {
-    router.push("/attorney"); // Or wherever you want to go back to
+    router.push("/attorney");
   };
 
   return (
@@ -76,7 +96,7 @@ export default function CaseTypePage() {
           <p className="mb-8 text-gray-700">Please select which type of case you are filing for.</p>
           <div className="flex gap-12">
             <button
-              className={`bg-[#f5ecd7] ml-10  px-10 py-8 rounded shadow text-2xl font-bold text-[#16305B] border-2 ${selected === "state" ? "border-[#16305B]" : "border-transparent"}`}
+              className={`bg-[#f5ecd7] ml-10 px-10 py-8 rounded shadow text-2xl font-bold text-[#16305B] border-2 ${selected === "state" ? "border-[#16305B]" : "border-transparent"}`}
               onClick={() => handleSelect("state")}
             >
               State

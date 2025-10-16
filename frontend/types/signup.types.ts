@@ -42,6 +42,9 @@ export interface AttorneyFormData {
   // Step 4 - Agreement
   userAgreementAccepted: boolean;
   verificationToken: string; // Already exists!
+
+  otp?: string; // NEW: OTP field
+  emailVerified?: boolean; // NEW: Email verification flag
 }
 
 // Juror Types (unchanged)
@@ -84,6 +87,7 @@ export interface JurorFormData {
   email: string;
   password: string;
   confirmPassword: string;
+  emailVerified?: boolean; 
   userAgreementAccepted: boolean;
   stateCode: string;
   countyCode: string;

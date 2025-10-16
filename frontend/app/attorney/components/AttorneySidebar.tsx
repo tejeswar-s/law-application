@@ -15,6 +15,7 @@ import {
   ArrowLeft,
   ArrowRight,
   AlertCircle,
+  Lock,
 } from "lucide-react";
 
 const NAV_BG = "#16305B";
@@ -47,7 +48,23 @@ export default function AttorneySidebar({ selectedSection, onSectionChange }: At
   const [unreadCount, setUnreadCount] = useState(0);
   const [rescheduleCount, setRescheduleCount] = useState(0);
   const [hoveredNotifications, setHoveredNotifications] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    // Check verification status from localStorage
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("attorneyUser");
+      if (stored) {
+        try {
+          const user = JSON.parse(stored);
+          setIsVerified(user.isVerified || false);
+        } catch (error) {
+          console.error("Failed to parse attorney user:", error);
+        }
+      }
+    }
+  }, []);
 
   const fetchUnreadCount = async () => {
     try {
@@ -100,15 +117,23 @@ export default function AttorneySidebar({ selectedSection, onSectionChange }: At
   }, []);
 
   const navLinks = [
-    { id: "profile", label: "Profile", icon: <User className="w-6 h-6" /> },
-    { id: "notifications", label: "Notifications", icon: <Bell className="w-6 h-6" /> },
+    { id: "profile", label: "Profile", icon: <User className="w-6 h-6" />, requiresVerification: false },
+    { id: "notifications", label: "Notifications", icon: <Bell className="w-6 h-6" />, requiresVerification: false },
   ];
 
   const mainNav = [
-    { id: "home", label: "Home", icon: <Home className="w-6 h-6" /> },
-    { id: "cases", label: "Cases", icon: <Briefcase className="w-6 h-6" /> },
-    { id: "calendar", label: "Calendar", icon: <Calendar className="w-6 h-6" /> },
+    { id: "home", label: "Home", icon: <Home className="w-6 h-6" />, requiresVerification: false },
+    { id: "cases", label: "Cases", icon: <Briefcase className="w-6 h-6" />, requiresVerification: true },
+    { id: "calendar", label: "Calendar", icon: <Calendar className="w-6 h-6" />, requiresVerification: true },
   ];
+
+  const handleSectionChange = (sectionId: string, requiresVerification: boolean) => {
+    if (requiresVerification && !isVerified) {
+      // Don't allow navigation to restricted sections
+      return;
+    }
+    onSectionChange(sectionId as Section);
+  };
 
   return (
     <aside
@@ -167,7 +192,7 @@ export default function AttorneySidebar({ selectedSection, onSectionChange }: At
               >
                 <button
                   type="button"
-                  onClick={() => onSectionChange(n.id as Section)}
+                  onClick={() => handleSectionChange(n.id, n.requiresVerification)}
                   className={`flex items-center rounded transition-all duration-500 ease-in-out cursor-pointer w-full ${
                     collapsed ? "justify-center py-3" : "px-4 py-3 gap-3"
                   } ${active ? "hover:bg-opacity-90" : "hover:bg-white/10"}`}
@@ -205,41 +230,61 @@ export default function AttorneySidebar({ selectedSection, onSectionChange }: At
       {/* Divider */}
       <div className="mt-6 border-t border-white/20" />
 
-      {/* Main nav */}
-      <nav className="flex flex-col mt-2">
+      {/* Main nav - FIXED: Added px-2 to container instead of mx-2 to buttons */}
+      <nav className="flex flex-col mt-2 px-2">
         {mainNav.map((m) => {
           const active = selectedSection === m.id;
+          const isLocked = m.requiresVerification && !isVerified;
+          
           return (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => onSectionChange(m.id as Section)}
-              className={`flex items-center rounded transition-all duration-500 ease-in-out cursor-pointer mx-2 ${
-                collapsed ? "justify-center py-3" : "px-4 py-3 gap-3"
-              } ${active ? "hover:bg-opacity-90" : "hover:bg-white/10"}`}
-              style={{ backgroundColor: active ? ACTIVE_BG : "transparent" }}
-            >
-              <div className="flex items-center justify-center w-10 h-10" style={{ color: active ? ACTIVE_TEXT : TEXT_COLOR }}>
-                {m.icon}
-              </div>
-              <span
-                className={`text-[16px] font-semibold whitespace-nowrap transition-all duration-500 ease-in-out ${
-                  collapsed ? "opacity-0 translate-x-[-10px] w-0 overflow-hidden" : "opacity-100 translate-x-0 ml-2"
-                }`}
-                style={{ color: active ? ACTIVE_TEXT : TEXT_COLOR }}
+            <div key={m.id} className="relative mb-1">
+              <button
+                type="button"
+                onClick={() => handleSectionChange(m.id, m.requiresVerification)}
+                disabled={isLocked}
+                className={`flex items-center rounded transition-all duration-500 ease-in-out w-full ${
+                  collapsed ? "justify-center py-3" : "px-4 py-3 gap-3"
+                } ${
+                  isLocked 
+                    ? "cursor-not-allowed opacity-60" 
+                    : "cursor-pointer hover:bg-white/10"
+                } ${active && !isLocked ? "hover:bg-opacity-90" : ""}`}
+                style={{ backgroundColor: active && !isLocked ? ACTIVE_BG : "transparent" }}
               >
-                {m.label}
-              </span>
-            </button>
+                <div className="flex items-center justify-center w-10 h-10 relative" style={{ color: active && !isLocked ? ACTIVE_TEXT : TEXT_COLOR }}>
+                  {m.icon}
+                  {isLocked && (
+                    <Lock className="absolute -bottom-1 -right-1 w-3 h-3 text-yellow-400" />
+                  )}
+                </div>
+                <span
+                  className={`text-[16px] font-semibold whitespace-nowrap transition-all duration-500 ease-in-out ${
+                    collapsed ? "opacity-0 translate-x-[-10px] w-0 overflow-hidden" : "opacity-100 translate-x-0 ml-2"
+                  }`}
+                  style={{ color: active && !isLocked ? ACTIVE_TEXT : TEXT_COLOR }}
+                >
+                  {m.label}
+                </span>
+              </button>
+              
+              {/* Tooltip for locked items */}
+              {isLocked && !collapsed && (
+                <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 hidden group-hover:block z-50">
+                  <div className="bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
+                    Requires verification
+                  </div>
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>
 
       {/* Reschedule Requests (if any pending) */}
-      {rescheduleCount > 0 && (
+      {rescheduleCount > 0 && isVerified && (
         <>
           <div className="mt-4 border-t border-white/20" />
-          <div className="mt-2 px-1">
+          <div className="mt-2 px-2">
             <button
               type="button"
               onClick={() => router.push("/attorney/reschedule-requests")}
@@ -294,6 +339,7 @@ export default function AttorneySidebar({ selectedSection, onSectionChange }: At
           onClose={() => setShowLogout(false)}
           onSignOut={() => {
             document.cookie = "token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            localStorage.removeItem("attorneyUser");
             setShowLogout(false);
             window.location.href = "/login/attorney";
           }}

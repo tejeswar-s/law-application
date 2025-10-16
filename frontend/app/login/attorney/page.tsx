@@ -61,8 +61,17 @@ export default function AttorneyLogin() {
       }
       if (data.user) {
         localStorage.setItem("attorneyUser", JSON.stringify(data.user));
-        localStorage.setItem("attorneyName", data.user.firstName); // (optional, for greeting)
+        localStorage.setItem("attorneyName", data.user.firstName);
       }
+      
+      // Clear signup drafts after successful login
+      try {
+        localStorage.removeItem('attorneySignupDraft');
+        localStorage.removeItem('jurorSignupDraft');
+      } catch (error) {
+        console.warn('Failed to clear signup drafts:', error);
+      }
+      
       // Redirect to attorney dashboard
       router.push("/attorney");
     } catch {

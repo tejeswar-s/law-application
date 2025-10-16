@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, HelpCircle, X } from "lucide-react";
+import { Eye, EyeOff, HelpCircle, X, ArrowLeft } from "lucide-react";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 type Attorney = {
@@ -15,7 +15,11 @@ type Attorney = {
   verificationStatus?: string;
 };
 
-export default function AttorneyProfileSection() {
+interface AttorneyProfileSectionProps {
+  onBack: () => void;
+}
+
+export default function AttorneyProfileSection({ onBack }: AttorneyProfileSectionProps) {
   const [attorney, setAttorney] = useState<Attorney | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +48,6 @@ export default function AttorneyProfileSection() {
         });
         const data = await res.json();
         if (data.success) {
-          // Fix: Ensure phoneNumber is set correctly from data.attorney.PhoneNumber
           const attorneyData = {
             ...data.attorney,
             phoneNumber: data.attorney.phoneNumber || data.attorney.PhoneNumber || "",
@@ -166,9 +169,18 @@ export default function AttorneyProfileSection() {
   return (
     <main className="flex-1 min-h-screen overflow-y-auto p-0">
       <div className="p-8 md:p-10 bg-[#F7F6F3] min-h-screen w-full">
-        {/* Header */}
+        {/* Header with Back Button */}
         <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold text-[#16305B]">Profile</h1>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-2 text-[#16305B] hover:text-[#1e417a] transition-colors"
+              aria-label="Go back to home"
+            >
+              <ArrowLeft size={24} />
+            </button>
+            <h1 className="text-2xl font-bold text-[#16305B]">Profile</h1>
+          </div>
           <button className="text-gray-500 text-sm flex items-center gap-1 hover:underline" style={{ marginRight: 8 }}>
             <HelpCircle size={16} className="inline-block align-middle" />
             <span className="inline-block align-middle">Help</span>

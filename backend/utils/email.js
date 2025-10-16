@@ -221,6 +221,68 @@ async function sendAccountVerifiedEmail(email, userType) {
     return false;
   }
 }
+/**
+ * Send OTP verification email
+ */
+async function sendOTPEmail(email, otp, userType) {
+  try {
+    const transporter = await createTransporter();
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Quick Verdicts - Email Verification Code",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h2 style="color: #16305B; margin: 0;">Quick Verdicts</h2>
+            <p style="color: #666; margin-top: 5px;">Email Verification</p>
+          </div>
+          
+          <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <p style="color: #16305B; margin: 0 0 15px 0;">Hello,</p>
+            <p style="color: #666; margin: 0 0 15px 0;">Thank you for signing up as ${
+              userType === "attorney" ? "an attorney" : "a juror"
+            } on Quick Verdicts.</p>
+            <p style="color: #666; margin: 0;">Your verification code is:</p>
+            
+            <div style="text-align: center; margin: 25px 0;">
+              <div style="display: inline-block; background: #16305B; color: white; padding: 20px 40px; border-radius: 8px; font-size: 32px; font-weight: bold; letter-spacing: 8px;">
+                ${otp}
+              </div>
+            </div>
+            
+            <p style="color: #666; margin: 15px 0 0 0; font-size: 14px;">
+              <strong>Important:</strong> This code expires in 10 minutes.
+            </p>
+          </div>
+          
+          <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+            <p style="color: #856404; margin: 0; font-size: 14px;">
+              ⚠️ <strong>Security Notice:</strong> Never share this code with anyone. Quick Verdicts staff will never ask for your verification code.
+            </p>
+          </div>
+          
+          <div style="text-align: center; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+            <p style="color: #999; font-size: 12px; margin: 0;">
+              If you didn't request this code, please ignore this email.
+            </p>
+            <p style="color: #999; font-size: 12px; margin: 10px 0 0 0;">
+              © ${new Date().getFullYear()} Quick Verdicts. All rights reserved.
+            </p>
+          </div>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log("✅ OTP email sent:", info.messageId);
+    return true;
+  } catch (error) {
+    console.error("❌ Error sending OTP email:", error);
+    return false;
+  }
+}
 
 module.exports = {
   sendPasswordResetEmail,
@@ -229,4 +291,5 @@ module.exports = {
   testEmailConfig,
   sendAccountDeclinedEmail,
   sendAccountVerifiedEmail,
+  sendOTPEmail, // NEW
 };

@@ -8,16 +8,25 @@ import AttorneyCalendarSection from "./AttorneyCalendarSection";
 
 type Section = "home" | "profile" | "notifications" | "cases" | "calendar";
 
-export default function AttorneyMainSection({ selectedSection }: { selectedSection: Section }) {
+interface AttorneyMainSectionProps {
+  selectedSection: Section;
+  onSectionChange: (section: Section) => void;
+}
+
+export default function AttorneyMainSection({ selectedSection, onSectionChange }: AttorneyMainSectionProps) {
+  const handleBack = () => {
+    onSectionChange("home");
+  };
+
   switch (selectedSection) {
     case "profile":
-      return <AttorneyProfileSection />;
+      return <AttorneyProfileSection onBack={handleBack} />;
     case "notifications":
-      return <AttorneyNotificationsSection />;
+      return <AttorneyNotificationsSection onBack={handleBack} />;
     case "cases":
-      return <AttorneyCasesSection />;
+      return <AttorneyCasesSection onBack={handleBack} />;
     case "calendar":
-      return <AttorneyCalendarSection />;
+      return <AttorneyCalendarSection onBack={handleBack} />;
     case "home":
     default:
       return <AttorneyHomeSection />;

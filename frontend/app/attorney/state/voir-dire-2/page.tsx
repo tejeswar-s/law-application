@@ -5,6 +5,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Stepper from "../../components/Stepper";
+import { Trash2 } from "lucide-react";
 
 export default function VoirDirePart2() {
   const [questions, setQuestions] = useState<string[]>([""]);
@@ -33,6 +34,21 @@ export default function VoirDirePart2() {
 
   const addQuestion = () => {
     setQuestions([...questions, ""]);
+  };
+
+  const removeQuestion = (idx: number) => {
+    if (questions.length === 1) {
+      // Don't allow removing the last question, just clear it
+      const newQuestions = [""];
+      setQuestions(newQuestions);
+      setValidationErrors([]);
+    } else {
+      const newQuestions = questions.filter((_, i) => i !== idx);
+      setQuestions(newQuestions);
+      // Also remove corresponding validation error
+      const newErrors = validationErrors.filter((_, i) => i !== idx);
+      setValidationErrors(newErrors);
+    }
   };
 
   const validate = () => {
@@ -85,13 +101,24 @@ export default function VoirDirePart2() {
                   <label className="block mb-1 text-[#16305B] font-medium">
                     Voir Dire #{idx + 1} <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
-                    value={q}
-                    onChange={e => handleChange(idx, e.target.value)}
-                    placeholder='Write out Voir Dire as a "Yes / No answer" question.'
-                    className="w-full px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={q}
+                      onChange={e => handleChange(idx, e.target.value)}
+                      placeholder='Write out Voir Dire as a "Yes / No answer" question.'
+                      className="flex-1 px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeQuestion(idx)}
+                      className="px-3 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors flex items-center gap-2 border border-red-200"
+                      title="Remove this question"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span className="text-sm font-medium">Remove</span>
+                    </button>
+                  </div>
                   {validationErrors[idx] && (
                     <p className="text-red-500 text-sm mt-1">{validationErrors[idx]}</p>
                   )}
@@ -100,9 +127,10 @@ export default function VoirDirePart2() {
               <button
                 type="button"
                 onClick={addQuestion}
-                className="text-[#16305B] text-sm font-medium mb-4"
+                className="text-[#16305B] text-sm font-medium mb-4 hover:text-[#0A2342] transition-colors flex items-center gap-1"
               >
-                + Add Another Voir Dire Question
+                <span className="text-lg">+</span>
+                <span>Add Another Voir Dire Question</span>
               </button>
               <button
                 type="submit"
@@ -117,4 +145,3 @@ export default function VoirDirePart2() {
     </div>
   );
 }
-

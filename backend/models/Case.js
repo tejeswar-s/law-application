@@ -1,30 +1,89 @@
+// =============================================
+// Case Model - Complete Case Management
+// =============================================
+
 const { poolPromise } = require("../config/db");
 
-/**
- * Case Model - Complete case management system
- * Handles all case states and transitions
- */
-
-// Case States for Attorney
+// Case status constants
 const ATTORNEY_CASE_STATES = {
-  PENDING_ADMIN_APPROVAL: "pending_admin_approval",
+  PENDING_ADMIN_APPROVAL: "pending",
   WAR_ROOM: "war_room",
   JOIN_TRIAL: "join_trial",
   VIEW_DETAILS: "view_details",
 };
 
-// Case States for Juror
-const JUROR_CASE_STATES = {
-  PENDING_APPROVAL: "pending_approval",
-  AWAITING_TRIAL: "awaiting_trial",
-  JOIN_TRIAL: "join_trial",
-  GIVE_VERDICTS: "give_verdicts",
+const ADMIN_APPROVAL_STATUSES = {
+  PENDING: "pending",
+  APPROVED: "approved",
+  REJECTED: "rejected",
 };
 
 /**
- * Find case by ID with all related data
- * @param {number} caseId - Case ID
- * @returns {Object} Complete case data
+ * Create new case
+ */
+async function createCase(caseData) {
+  try {
+    const pool = await poolPromise;
+
+    // Parse groups if they're strings
+    const plaintiffGroups =
+      typeof caseData.plaintiffGroups === "string"
+        ? JSON.parse(caseData.plaintiffGroups)
+        : caseData.plaintiffGroups;
+    const defendantGroups =
+      typeof caseData.defendantGroups === "string"
+        ? JSON.parse(caseData.defendantGroups)
+        : caseData.defendantGroups;
+
+    const result = await pool
+      .request()
+      .input("attorneyId", caseData.attorneyId)
+      .input("caseType", caseData.caseType)
+      .input("caseTier", caseData.caseTier)
+      .input("county", caseData.county)
+      .input("caseTitle", caseData.caseTitle)
+      .input("caseDescription", caseData.caseDescription || "")
+      .input("paymentMethod", caseData.paymentMethod || "")
+      .input("paymentAmount", parseFloat(caseData.paymentAmount) || 0)
+      .input("scheduledDate", caseData.scheduledDate)
+      .input("scheduledTime", caseData.scheduledTime)
+      .input("plaintiffGroups", JSON.stringify(plaintiffGroups))
+      .input("defendantGroups", JSON.stringify(defendantGroups))
+      .input("voirDire1Questions", JSON.stringify(caseData.voirDire1Questions || []))
+      .input("voirDire2Questions", JSON.stringify(caseData.voirDire2Questions || []))
+      .input("attorneyStatus", ATTORNEY_CASE_STATES.PENDING_ADMIN_APPROVAL) // CRITICAL: Start as pending
+      .input("adminApprovalStatus", ADMIN_APPROVAL_STATUSES.PENDING) // CRITICAL: Pending admin approval
+      .query(`
+        INSERT INTO dbo.Cases (
+          AttorneyId, CaseType, CaseTier, County,
+          CaseTitle, CaseDescription, PaymentMethod, PaymentAmount,
+          ScheduledDate, ScheduledTime,
+          PlaintiffGroups, DefendantGroups,
+          VoirDire1Questions, VoirDire2Questions,
+          AttorneyStatus, AdminApprovalStatus,
+          CreatedAt, UpdatedAt
+        )
+        VALUES (
+          @attorneyId, @caseType, @caseTier, @county,
+          @caseTitle, @caseDescription, @paymentMethod, @paymentAmount,
+          @scheduledDate, @scheduledTime,
+          @plaintiffGroups, @defendantGroups,
+          @voirDire1Questions, @voirDire2Questions,
+          @attorneyStatus, @adminApprovalStatus,
+          GETUTCDATE(), GETUTCDATE()
+        );
+        SELECT SCOPE_IDENTITY() AS CaseId;
+      `);
+
+    return result.recordset[0].CaseId;
+  } catch (error) {
+    console.error("Create case error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Find case by ID
  */
 async function findById(caseId) {
   try {
@@ -32,192 +91,54 @@ async function findById(caseId) {
     const result = await pool.request().input("caseId", caseId).query(`
         SELECT 
           c.*,
-          a.FirstName + ' ' + a.LastName as AttorneyName,
-          a.LawFirmName,
-          a.Email as AttorneyEmail
+          a.FirstName + ' ' + a.LastName AS AttorneyName,
+          a.Email AS AttorneyEmail,
+          a.LawFirmName
         FROM dbo.Cases c
-        INNER JOIN dbo.Attorneys a ON c.AttorneyId = a.AttorneyId
+        LEFT JOIN dbo.Attorneys a ON c.AttorneyId = a.AttorneyId
         WHERE c.CaseId = @caseId
       `);
 
     return result.recordset[0] || null;
   } catch (error) {
-    console.error("Error finding case by ID:", error);
+    console.error("Find case by ID error:", error);
     throw error;
   }
 }
 
 /**
- * Create new case
- * @param {Object} caseData - Case creation data
- * @returns {number} New case ID
- */
-async function createCase(caseData) {
-  try {
-    const pool = await poolPromise;
-    const result = await pool
-      .request()
-      .input("attorneyId", caseData.attorneyId)
-      .input("caseType", caseData.caseType) // 'state' or 'federal'
-      .input("caseTier", caseData.caseTier)
-      .input("county", caseData.county)
-      .input("caseTitle", caseData.caseTitle)
-      .input("caseDescription", caseData.caseDescription)
-      .input("paymentMethod", caseData.paymentMethod)
-      .input("paymentAmount", caseData.paymentAmount)
-      .input("scheduledDate", caseData.scheduledDate)
-      .input("scheduledTime", caseData.scheduledTime)
-      .input("plaintiffGroups", JSON.stringify(caseData.plaintiffGroups || []))
-      .input("defendantGroups", JSON.stringify(caseData.defendantGroups || []))
-      .input(
-        "voirDire1Questions",
-        JSON.stringify(caseData.voirDire1Questions || [])
-      )
-      .input(
-        "voirDire2Questions",
-        JSON.stringify(caseData.voirDire2Questions || [])
-      ).query(`
-        INSERT INTO dbo.Cases (
-          AttorneyId, CaseType, CaseTier, County, CaseTitle, CaseDescription,
-          PaymentMethod, PaymentAmount, ScheduledDate, ScheduledTime,
-          PlaintiffGroups, DefendantGroups, VoirDire1Questions, VoirDire2Questions,
-          AttorneyStatus, JurorStatus, AdminApprovalStatus, RequiredJurors,
-          CreatedAt, UpdatedAt
-        ) VALUES (
-          @attorneyId, @caseType, @caseTier, @county, @caseTitle, @caseDescription,
-          @paymentMethod, @paymentAmount, @scheduledDate, @scheduledTime,
-          @plaintiffGroups, @defendantGroups, @voirDire1Questions, @voirDire2Questions,
-          '${ATTORNEY_CASE_STATES.PENDING_ADMIN_APPROVAL}', null, 'pending', 2,
-          GETUTCDATE(), GETUTCDATE()
-        );
-        SELECT SCOPE_IDENTITY() as CaseId;
-      `);
-
-    return result.recordset[0].CaseId;
-  } catch (error) {
-    console.error("Error creating case:", error);
-    throw error;
-  }
-}
-
-/**
- * Get cases by attorney ID with filtering
- * @param {number} attorneyId - Attorney ID
- * @param {string} status - Optional status filter
- * @returns {Array} Array of cases
+ * Get cases by attorney
  */
 async function getCasesByAttorney(attorneyId, status = null) {
   try {
     const pool = await poolPromise;
     let query = `
-      SELECT 
-        c.*,
-        (SELECT COUNT(*) FROM dbo.JurorApplications ja WHERE ja.CaseId = c.CaseId AND ja.Status = 'approved') as ApprovedJurors,
-        (SELECT COUNT(*) FROM dbo.JurorApplications ja WHERE ja.CaseId = c.CaseId AND ja.Status = 'pending') as PendingApplications
-      FROM dbo.Cases c
-      WHERE c.AttorneyId = @attorneyId
+      SELECT * FROM dbo.Cases 
+      WHERE AttorneyId = @attorneyId
     `;
+
+    if (status) {
+      query += ` AND AttorneyStatus = @status`;
+    }
+
+    query += ` ORDER BY CreatedAt DESC`;
 
     const request = pool.request().input("attorneyId", attorneyId);
 
     if (status) {
-      query += ` AND c.AttorneyStatus = @status`;
       request.input("status", status);
     }
-
-    query += ` ORDER BY c.CreatedAt DESC`;
 
     const result = await request.query(query);
     return result.recordset;
   } catch (error) {
-    console.error("Error getting cases by attorney:", error);
+    console.error("Get cases by attorney error:", error);
     throw error;
   }
 }
 
 /**
- * Get available cases for jurors (active cases needing jurors)
- * @param {string} county - Juror's county for case matching
- * @returns {Array} Available cases for application
- */
-async function getAvailableCasesForJurors(county) {
-  try {
-    const pool = await poolPromise;
-    const result = await pool.request().input("county", county).query(`
-        SELECT 
-          c.CaseId,
-          c.CaseTitle,
-          c.CaseDescription,
-          c.ScheduledDate,
-          c.ScheduledTime,
-          c.PaymentAmount,
-          c.RequiredJurors,
-          (SELECT COUNT(*) FROM dbo.JurorApplications ja WHERE ja.CaseId = c.CaseId AND ja.Status = 'approved') as ApprovedJurors,
-          a.LawFirmName
-        FROM dbo.Cases c
-        INNER JOIN dbo.Attorneys a ON c.AttorneyId = a.AttorneyId
-        WHERE c.County = @county 
-          AND c.AttorneyStatus = '${ATTORNEY_CASE_STATES.WAR_ROOM}'
-          AND c.AdminApprovalStatus = 'approved'
-          AND (SELECT COUNT(*) FROM dbo.JurorApplications ja WHERE ja.CaseId = c.CaseId AND ja.Status = 'approved') < c.RequiredJurors
-        ORDER BY c.ScheduledDate ASC
-      `);
-
-    return result.recordset;
-  } catch (error) {
-    console.error("Error getting available cases for jurors:", error);
-    throw error;
-  }
-}
-
-/**
- * Update case status
- * @param {number} caseId - Case ID
- * @param {Object} statusUpdate - Status update object
- */
-async function updateCaseStatus(caseId, statusUpdate) {
-  try {
-    const pool = await poolPromise;
-    const updates = [];
-    const request = pool.request().input("caseId", caseId);
-
-    if (statusUpdate.attorneyStatus) {
-      updates.push("AttorneyStatus = @attorneyStatus");
-      request.input("attorneyStatus", statusUpdate.attorneyStatus);
-    }
-
-    if (statusUpdate.adminApprovalStatus) {
-      updates.push("AdminApprovalStatus = @adminApprovalStatus");
-      request.input("adminApprovalStatus", statusUpdate.adminApprovalStatus);
-
-      if (statusUpdate.adminApprovalStatus === "approved") {
-        updates.push("ApprovedAt = GETUTCDATE()");
-        updates.push("AttorneyStatus = @newAttorneyStatus");
-        request.input("newAttorneyStatus", ATTORNEY_CASE_STATES.WAR_ROOM);
-      }
-    }
-
-    if (statusUpdate.adminComments) {
-      updates.push("AdminComments = @adminComments");
-      request.input("adminComments", statusUpdate.adminComments);
-    }
-
-    updates.push("UpdatedAt = GETUTCDATE()");
-
-    await request.query(`
-      UPDATE dbo.Cases 
-      SET ${updates.join(", ")}
-      WHERE CaseId = @caseId
-    `);
-  } catch (error) {
-    console.error("Error updating case status:", error);
-    throw error;
-  }
-}
-
-/**
- * Get cases requiring admin approval
- * @returns {Array} Cases pending admin approval
+ * Get cases pending admin approval
  */
 async function getCasesPendingAdminApproval() {
   try {
@@ -225,28 +146,103 @@ async function getCasesPendingAdminApproval() {
     const result = await pool.request().query(`
       SELECT 
         c.*,
-        a.FirstName + ' ' + a.LastName as AttorneyName,
-        a.LawFirmName,
-        a.Email as AttorneyEmail,
-        a.StateBarNumber
+        a.FirstName + ' ' + a.LastName AS AttorneyName,
+        a.Email AS AttorneyEmail,
+        a.LawFirmName
       FROM dbo.Cases c
-      INNER JOIN dbo.Attorneys a ON c.AttorneyId = a.AttorneyId
+      LEFT JOIN dbo.Attorneys a ON c.AttorneyId = a.AttorneyId
       WHERE c.AdminApprovalStatus = 'pending'
-      ORDER BY c.CreatedAt ASC
+      ORDER BY c.CreatedAt DESC
     `);
 
     return result.recordset;
   } catch (error) {
-    console.error("Error getting cases pending admin approval:", error);
+    console.error("Get pending cases error:", error);
     throw error;
   }
 }
 
 /**
- * Check if attorney can transition case to next state
- * @param {number} caseId - Case ID
- * @param {string} newStatus - Desired new status
- * @returns {Object} Validation result
+ * Get available cases for jurors (war_room status and approved by admin)
+ */
+async function getAvailableCasesForJurors(county = null) {
+  try {
+    const pool = await poolPromise;
+    let query = `
+      SELECT 
+        c.*,
+        a.FirstName + ' ' + a.LastName AS AttorneyName,
+        a.LawFirmName
+      FROM dbo.Cases c
+      LEFT JOIN dbo.Attorneys a ON c.AttorneyId = a.AttorneyId
+      WHERE c.AttorneyStatus = 'war_room'
+        AND c.AdminApprovalStatus = 'approved'
+    `;
+
+    if (county) {
+      query += ` AND c.County = @county`;
+    }
+
+    query += ` ORDER BY c.ScheduledDate ASC`;
+
+    const request = pool.request();
+    if (county) {
+      request.input("county", county);
+    }
+
+    const result = await request.query(query);
+    return result.recordset;
+  } catch (error) {
+    console.error("Get available cases for jurors error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Update case status
+ */
+async function updateCaseStatus(caseId, statusUpdates) {
+  try {
+    const pool = await poolPromise;
+    const { attorneyStatus, adminApprovalStatus, adminComments } =
+      statusUpdates;
+
+    let query = `UPDATE dbo.Cases SET UpdatedAt = GETUTCDATE()`;
+    const request = pool.request().input("caseId", caseId);
+
+    if (attorneyStatus !== undefined) {
+      query += `, AttorneyStatus = @attorneyStatus`;
+      request.input("attorneyStatus", attorneyStatus);
+    }
+
+    if (adminApprovalStatus !== undefined) {
+      query += `, AdminApprovalStatus = @adminApprovalStatus`;
+      request.input("adminApprovalStatus", adminApprovalStatus);
+
+      // When admin approves, transition to war_room
+      if (adminApprovalStatus === "approved") {
+        query += `, AttorneyStatus = @warRoomStatus, ApprovedAt = GETUTCDATE()`;
+        request.input("warRoomStatus", ATTORNEY_CASE_STATES.WAR_ROOM);
+      }
+    }
+
+    if (adminComments !== undefined) {
+      query += `, AdminComments = @adminComments`;
+      request.input("adminComments", adminComments);
+    }
+
+    query += ` WHERE CaseId = @caseId`;
+
+    await request.query(query);
+    return true;
+  } catch (error) {
+    console.error("Update case status error:", error);
+    throw error;
+  }
+}
+
+/**
+ * Validate case state transition
  */
 async function validateCaseStateTransition(caseId, newStatus) {
   try {
@@ -259,162 +255,104 @@ async function validateCaseStateTransition(caseId, newStatus) {
 
     // Define valid transitions
     const validTransitions = {
-      [ATTORNEY_CASE_STATES.PENDING_ADMIN_APPROVAL]: [
-        ATTORNEY_CASE_STATES.WAR_ROOM,
-      ],
-      [ATTORNEY_CASE_STATES.WAR_ROOM]: [ATTORNEY_CASE_STATES.JOIN_TRIAL],
-      [ATTORNEY_CASE_STATES.JOIN_TRIAL]: [ATTORNEY_CASE_STATES.VIEW_DETAILS],
+      pending: [], // Cannot transition from pending until admin approves
+      war_room: ["join_trial"],
+      join_trial: ["view_details"],
+      view_details: [], // Final state
     };
 
-    if (
-      !validTransitions[currentStatus] ||
-      !validTransitions[currentStatus].includes(newStatus)
-    ) {
+    if (!validTransitions[currentStatus]) {
+      return { valid: false, message: "Invalid current status" };
+    }
+
+    if (!validTransitions[currentStatus].includes(newStatus)) {
       return {
         valid: false,
         message: `Cannot transition from ${currentStatus} to ${newStatus}`,
       };
     }
 
-    // Additional validation based on specific transitions
+    // Additional validation for specific transitions
     if (newStatus === ATTORNEY_CASE_STATES.JOIN_TRIAL) {
-      const approvedJurors = await getApprovedJurorsCount(caseId);
-      if (approvedJurors < caseData.RequiredJurors) {
+      // Check if case is approved by admin
+      if (caseData.AdminApprovalStatus !== "approved") {
         return {
           valid: false,
-          message: `Need ${caseData.RequiredJurors} approved jurors, only have ${approvedJurors}`,
+          message: "Case must be approved by admin before starting trial",
         };
       }
     }
 
-    return { valid: true, message: "Transition allowed" };
+    return { valid: true };
   } catch (error) {
-    console.error("Error validating case state transition:", error);
+    console.error("Validate case state transition error:", error);
     throw error;
   }
 }
 
 /**
- * Get count of approved jurors for a case
- * @param {number} caseId - Case ID
- * @returns {number} Count of approved jurors
+ * Get case statistics for admin dashboard
  */
-async function getApprovedJurorsCount(caseId) {
+async function getCaseStatistics() {
   try {
     const pool = await poolPromise;
-    const result = await pool.request().input("caseId", caseId).query(`
-        SELECT COUNT(*) as count
-        FROM dbo.JurorApplications
-        WHERE CaseId = @caseId AND Status = 'approved'
-      `);
+    const result = await pool.request().query(`
+      SELECT 
+        COUNT(*) as TotalCases,
+        SUM(CASE WHEN AdminApprovalStatus = 'pending' THEN 1 ELSE 0 END) as PendingApproval,
+        SUM(CASE WHEN AdminApprovalStatus = 'approved' THEN 1 ELSE 0 END) as Approved,
+        SUM(CASE WHEN AdminApprovalStatus = 'rejected' THEN 1 ELSE 0 END) as Rejected,
+        SUM(CASE WHEN AttorneyStatus = 'war_room' THEN 1 ELSE 0 END) as InWarRoom,
+        SUM(CASE WHEN AttorneyStatus = 'join_trial' THEN 1 ELSE 0 END) as InTrial,
+        SUM(CASE WHEN AttorneyStatus = 'view_details' THEN 1 ELSE 0 END) as Completed
+      FROM dbo.Cases
+    `);
 
-    return result.recordset[0].count;
+    return result.recordset[0];
   } catch (error) {
-    console.error("Error getting approved jurors count:", error);
-    throw error;
-  }
-}
-
-/**
- * Legacy support: Get cases in ScheduledTrials format for backwards compatibility
- * @param {number} attorneyId - Attorney ID
- * @returns {Array} Cases in legacy format
- */
-async function getCasesLegacyFormat(attorneyId) {
-  try {
-    const cases = await getCasesByAttorney(attorneyId);
-
-    // Transform to match legacy ScheduledTrials format
-    return cases.map((caseItem) => ({
-      Id: caseItem.CaseId,
-      County: caseItem.County,
-      CaseType: caseItem.CaseType,
-      CaseTier: caseItem.CaseTier,
-      CaseDescription: caseItem.CaseDescription,
-      PaymentMethod: caseItem.PaymentMethod,
-      PaymentAmount: caseItem.PaymentAmount,
-      PlaintiffGroups: caseItem.PlaintiffGroups,
-      DefendantGroups: caseItem.DefendantGroups,
-      ScheduledDate: caseItem.ScheduledDate,
-      ScheduledTime: caseItem.ScheduledTime,
-      Name: caseItem.CaseTitle, // Map title back to name for legacy support
-      Email: "", // Will be filled by route handler
-      UserId: attorneyId,
-      AttorneyStatus: caseItem.AttorneyStatus,
-      AdminApprovalStatus: caseItem.AdminApprovalStatus,
-    }));
-  } catch (error) {
-    console.error("Error getting cases in legacy format:", error);
-    throw error;
-  }
-}
-
-/**
- * Get available cases for jurors based on location
- * @param {string} jurorState - Juror's state
- * @param {string} jurorCounty - Juror's county
- * @returns {Array} Available cases
- */
-async function getAvailableCasesForJuror(jurorState, jurorCounty) {
-  try {
-    const pool = await poolPromise;
-    const result = await pool
-      .request()
-      .input("jurorState", jurorState)
-      .input("jurorCounty", jurorCounty).query(`
-        SELECT 
-          c.CaseId,
-          c.CaseTitle,
-          c.CaseDescription,
-          c.CaseType,
-          c.CaseTier,
-          c.County,
-          c.ScheduledDate,
-          c.ScheduledTime,
-          c.PaymentAmount,
-          c.RequiredJurors,
-          c.PlaintiffGroups,
-          c.DefendantGroups,
-          c.VoirDire1Questions,
-          c.VoirDire2Questions,
-          a.LawFirmName,
-          a.FirstName + ' ' + a.LastName as AttorneyName,
-          (SELECT COUNT(*) FROM dbo.JurorApplications ja 
-           WHERE ja.CaseId = c.CaseId AND ja.Status = 'approved') as ApprovedJurors
-        FROM dbo.Cases c
-        INNER JOIN dbo.Attorneys a ON c.AttorneyId = a.AttorneyId
-        WHERE c.AttorneyStatus = '${ATTORNEY_CASE_STATES.WAR_ROOM}'
-          AND c.AdminApprovalStatus = 'approved'
-          AND (
-            -- Federal cases: available to all
-            (c.CaseType = 'federal')
-            OR
-            -- State cases: must match both state and county
-            (c.CaseType = 'state' AND c.County = @jurorCounty AND a.State = @jurorState)
-          )
-          AND (SELECT COUNT(*) FROM dbo.JurorApplications ja 
-               WHERE ja.CaseId = c.CaseId AND ja.Status = 'approved') < c.RequiredJurors
-        ORDER BY c.ScheduledDate ASC
-      `);
-
-    return result.recordset;
-  } catch (error) {
-    console.error("Error getting available cases for juror:", error);
+    console.error("Get case statistics error:", error);
     throw error;
   }
 }
 
 module.exports = {
-  ATTORNEY_CASE_STATES,
-  JUROR_CASE_STATES,
-  findById,
   createCase,
+  findById,
   getCasesByAttorney,
-  getAvailableCasesForJurors,
-  getAvailableCasesForJuror,
-  updateCaseStatus,
   getCasesPendingAdminApproval,
+  getAvailableCasesForJurors,
+  updateCaseStatus,
   validateCaseStateTransition,
-  getApprovedJurorsCount,
-  getCasesLegacyFormat,
+  getCaseStatistics,
+  ATTORNEY_CASE_STATES,
+  ADMIN_APPROVAL_STATUSES,
 };
+// ```
+
+// **Critical Changes:**
+// - ✅ **Line 28-29**: Cases now start with `PENDING_ADMIN_APPROVAL` status
+// - ✅ **Line 151**: When admin approves a case, it automatically transitions to `war_room` status
+// - ✅ **Line 211-217**: Validation ensures cases can't move from pending until admin approves
+// - ✅ **Updated comments** to clarify the correct flow
+
+// ---
+
+// ## **Flow Summary:**
+
+// ### ✅ **Correct Case Status Flow:**
+// ```
+// 1. Attorney creates case
+//    ↓
+//    Status: "pending" (Pending Admin Approval)
+//    ↓
+// 2. Admin approves case
+//    ↓
+//    Status: "war_room" (Open for juror applications)
+//    ↓
+// 3. Attorney submits war room
+//    ↓
+//    Status: "join_trial" (Ready for trial)
+//    ↓
+// 4. Trial completes
+//    ↓
+//    Status: "view_details" (View verdicts)

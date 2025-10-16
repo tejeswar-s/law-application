@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { BellIcon, CheckCircleIcon } from "@heroicons/react/24/outline";
+import { ArrowLeft } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL 
   ? process.env.NEXT_PUBLIC_API_URL.replace(/\/api$/, '')
@@ -24,7 +25,11 @@ type Notification = {
   CaseTitle?: string;
 };
 
-export default function AttorneyNotificationsSection() {
+interface AttorneyNotificationsSectionProps {
+  onBack: () => void;
+}
+
+export default function AttorneyNotificationsSection({ onBack }: AttorneyNotificationsSectionProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "unread">("all");
@@ -106,11 +111,20 @@ export default function AttorneyNotificationsSection() {
   return (
     <main className="flex-1 px-10 py-8 bg-[#F7F6F3] transition-all duration-300 ease-in-out">
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-[#16305B]">Notifications</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : 'All caught up!'}
-          </p>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 text-[#16305B] hover:text-[#1e417a] transition-colors"
+            aria-label="Go back to home"
+          >
+            <ArrowLeft size={24} />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-[#16305B]">Notifications</h1>
+            <p className="text-sm text-gray-600 mt-1">
+              {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : 'All caught up!'}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex gap-2">

@@ -1,11 +1,11 @@
-
 // ===== SCHEDULE TRIAL PAGE =====
-// app/attorney/state/schedule-trail/page.tsx (note the typo in the URL 'trail' instead of 'trial')
+// app/attorney/state/schedule-trail/page.tsx
 "use client";
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Stepper from "../../components/Stepper";
+import { Calendar, Clock, MapPin, Monitor, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
@@ -290,10 +290,10 @@ export default function ScheduleTrialPage() {
             />
           </div>
           <div className="px-8 py-8 mt-30">
-            <h2 className="text-3xl font-medium mb-4">Quick Verdicts</h2>
+            <h2 className="text-3xl font-medium mb-4">Schedule Trial</h2>
             <div className="text-sm leading-relaxed text-blue-100 space-y-3">
-              <p>Schedule your trial date and time.</p>
-              <p className="text-xs text-blue-200">⚠️ Only dates with available admin slots are shown</p>
+              <p>Select your preferred date and time for the trial.</p>
+              <p className="text-xs text-blue-200">⚠️ Only available dates are shown</p>
             </div>
           </div>
         </div>
@@ -304,7 +304,7 @@ export default function ScheduleTrialPage() {
           <div className="flex flex-col items-center justify-center w-full h-screen">
             <BufferingAnimation />
             <div className="mt-6 text-[#16305B] text-lg font-semibold">
-              Opening dashboard...
+              Creating case and opening dashboard...
             </div>
           </div>
         ) : (
@@ -314,167 +314,124 @@ export default function ScheduleTrialPage() {
               <Stepper currentStep={6} />
             </div>
 
-            <div className="w-full max-w-4xl mx-auto mb-8 px-6">
-              <h1 className="text-3xl font-semibold text-[#333333] mb-2">Schedule Trial</h1>
-              <p className="text-[#666666] text-base">
-                Choose your ideal date and time for this trial you are filing.
+            <div className="w-full max-w-6xl mx-auto mb-8 px-20">
+              <h1 className="text-3xl font-bold text-[#16305B] mb-2">Schedule Trial</h1>
+              <p className="text-gray-600 text-base">
+                Choose your preferred date and time for this trial.
               </p>
             </div>
 
             {scheduled ? (
-              <div className="flex-1 flex flex-col items-center justify-center">
-                <div className="w-full max-w-xl bg-white rounded-xl shadow border border-[#e5e7eb] flex flex-col items-center py-10 px-8">
-                  <div className="mb-4">
-                    <Image
-                      src="/user-avatar.png"
-                      alt="User Avatar"
-                      width={56}
-                      height={56}
-                      className="rounded-full"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[#16305B] text-2xl">✔️</span>
-                    <span className="text-black font-semibold text-lg">
-                      You are scheduled
-                    </span>
-                  </div>
-                  <div className="text-gray-500 text-sm mb-6 text-center">
-                    A calendar invitation has been sent to your email address.
-                  </div>
-                  <div className="w-full bg-white border border-[#e5e7eb] rounded-lg p-6 mb-6">
-                    <div className="font-bold text-black mb-2">Trial Scheduling</div>
-                    <div className="flex items-center gap-2 mb-2 text-black">
-                      <span>👤</span>
-                      <span>{name || "Joe Attorney"}</span>
+              <div className="flex-1 flex flex-col items-center justify-center px-8">
+                <div className="w-full max-w-2xl bg-white rounded-2xl shadow-lg border border-gray-200 p-10">
+                  <div className="text-center mb-8">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
+                      <CheckCircle2 className="w-10 h-10 text-green-600" />
                     </div>
-                    <div className="flex items-center gap-2 mb-2 text-black">
-                      <span>🕑</span>
-                      <span>
-                        {selectedTime && selectedDate
-                          ? `${selectedTime} - ${getEndTime(selectedTime)}, ${formatDisplayDate(selectedDate)}`
-                          : "16:00 - 18:30, Monday, August 19, 2025"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mb-2 text-black">
-                      <span>📍</span>
-                      <span>Dallas, Texas, USA</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-black">
-                      <span>🖥️</span>
-                      <span>Web conferencing details to follow.</span>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Trial Scheduled Successfully!</h2>
+                    <p className="text-gray-600">A confirmation has been sent to your email address.</p>
+                  </div>
+
+                  <div className="bg-gray-50 rounded-xl p-6 mb-8 border border-gray-200">
+                    <h3 className="font-semibold text-gray-900 mb-4 text-lg">Trial Details</h3>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <Calendar className="w-5 h-5 text-[#16305B] mt-0.5" />
+                        <div>
+                          <div className="text-sm text-gray-600">Date</div>
+                          <div className="font-medium text-gray-900">
+                            {selectedDate ? formatDisplayDate(selectedDate) : "Not selected"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <Clock className="w-5 h-5 text-[#16305B] mt-0.5" />
+                        <div>
+                          <div className="text-sm text-gray-600">Time</div>
+                          <div className="font-medium text-gray-900">
+                            {selectedTime ? `${selectedTime} - ${getEndTime(selectedTime)}` : "Not selected"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <MapPin className="w-5 h-5 text-[#16305B] mt-0.5" />
+                        <div>
+                          <div className="text-sm text-gray-600">Location</div>
+                          <div className="font-medium text-gray-900">
+                            {localStorage.getItem("county") || "County"}, {localStorage.getItem("state") || "State"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <Monitor className="w-5 h-5 text-[#16305B] mt-0.5" />
+                        <div>
+                          <div className="text-sm text-gray-600">Format</div>
+                          <div className="font-medium text-gray-900">Virtual Trial (Details will follow)</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
+
                   <button
                     type="button"
-                    className="w-full bg-[#16305B] text-white font-semibold px-8 py-3 rounded-md hover:bg-[#0A2342] transition"
+                    className="w-full bg-[#16305B] text-white font-semibold px-8 py-3 rounded-lg hover:bg-[#0A2342] transition-colors"
                     onClick={handleComplete}
                   >
-                    Complete
+                    Complete & Go to Dashboard
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="flex-1 flex justify-center">
-                <div className="w-full max-w-6xl bg-white rounded-2xl shadow-sm border border-[#e5e7eb] flex overflow-hidden" style={{ height: 'fit-content' }}>
-                  <div className="w-80 bg-white p-8 flex flex-col">
-                    <div className="flex items-center mb-6">
-                      <div className="w-12 h-12 bg-yellow-400 rounded-full flex items-center justify-center mr-3">
-                        <Image
-                          src="/user-avatar.png"
-                          alt="Quick Verdicts"
-                          width={32}
-                          height={32}
-                          className="rounded-full"
-                        />
+              <div className="flex-1 flex justify-center px-8">
+                <div className="w-full max-w-5xl bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+                  <div className="grid md:grid-cols-2">
+                    {/* Left Side - Calendar */}
+                    <div className="p-8 border-r border-gray-200">
+                      <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-xl font-bold text-gray-900">Select Date</h2>
+                        {loadingSlots && (
+                          <span className="text-sm text-blue-600">Loading...</span>
+                        )}
                       </div>
-                      <div>
-                        <div className="text-sm text-gray-600 font-medium">Quick Verdicts</div>
-                      </div>
-                    </div>
-                    
-                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Trial Scheduling</h2>
-                    
-                    <div className="space-y-4 mb-8">
-                      <div className="flex items-center text-gray-700">
-                        <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="font-medium">2hr 30 min</span>
-                      </div>
-                      
-                      <div className="flex items-start text-gray-700">
-                        <svg className="w-5 h-5 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
-                        <span className="text-sm leading-relaxed">Web conferencing details provided upon confirmation.</span>
-                      </div>
-                    </div>
 
-                    {selectedDate && selectedTime && (
-                      <div className="border-t border-gray-200 pt-6">
-                        <div className="space-y-3 text-sm">
-                          <div className="flex items-center text-gray-700">
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span className="font-medium">{selectedTime} - {getEndTime(selectedTime)}, {formatDisplayDate(selectedDate)}</span>
-                          </div>
-                          <div className="flex items-center text-gray-700">
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            <span>Dallas, Texas, USA</span>
-                          </div>
-                        </div>
+                      {/* Month Navigation */}
+                      <div className="flex items-center justify-between mb-6">
+                        <button 
+                          onClick={handlePrevMonth}
+                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                          aria-label="Previous month"
+                        >
+                          <ChevronLeft className="w-5 h-5 text-gray-600" />
+                        </button>
+                        <span className="text-lg font-semibold text-gray-900">
+                          {getMonthName(currentMonth)} {currentYear}
+                        </span>
+                        <button 
+                          onClick={handleNextMonth}
+                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                          aria-label="Next month"
+                        >
+                          <ChevronRight className="w-5 h-5 text-gray-600" />
+                        </button>
                       </div>
-                    )}
-                  </div>
 
-                  <div className="flex-1 bg-gray-50 p-8 border-l border-gray-200">
-                    {!selectedDate ? (
-                      <>
-                        <div className="mb-6">
-                          <h3 className="text-xl font-semibold text-gray-900 mb-2">Select a Date & Time</h3>
-                          {loadingSlots && (
-                            <p className="text-sm text-blue-600">Loading available dates...</p>
-                          )}
-                        </div>
-                        
-                        <div className="flex items-center justify-between mb-2">
-                          <button 
-                            onClick={handlePrevMonth}
-                            className="p-1 hover:bg-white hover:shadow-sm rounded-lg transition-all text-gray-600"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                            </svg>
-                          </button>
-                          <span className="text-base font-semibold text-gray-900">
-                            {getMonthName(currentMonth)} {currentYear}
-                          </span>
-                          <button 
-                            onClick={handleNextMonth}
-                            className="p-1 hover:bg-white hover:shadow-sm rounded-lg transition-all text-gray-600"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </button>
-                        </div>
-                        
-                        <div className="grid grid-cols-7 gap-0.5 mb-1">
-                          {["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"].map((day) => (
-                            <div key={day} className="text-xs font-medium text-gray-500 text-center py-1">
+                      {/* Calendar Grid */}
+                      <div className="mb-4">
+                        <div className="grid grid-cols-7 gap-1 mb-2">
+                          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+                            <div key={day} className="text-xs font-semibold text-gray-500 text-center py-2">
                               {day}
                             </div>
                           ))}
                         </div>
                         
-                        <div className="grid grid-cols-7 gap-0.5 mb-4">
+                        <div className="grid grid-cols-7 gap-1">
                           {Array.from({ length: startOffset }, (_, index) => (
-                            <div key={`empty-${index}`} className="h-8"></div>
+                            <div key={`empty-${index}`} className="h-10"></div>
                           ))}
                           
                           {Array.from({ length: daysInMonth }, (_, index) => {
@@ -482,18 +439,24 @@ export default function ScheduleTrialPage() {
                             const date = new Date(currentYear, currentMonth, day);
                             const isAvailable = isDateAvailable(date);
                             const isTodayDate = isToday(date);
+                            const isSelected = selectedDate && 
+                              selectedDate.getDate() === day && 
+                              selectedDate.getMonth() === currentMonth &&
+                              selectedDate.getFullYear() === currentYear;
                             
                             return (
                               <button
                                 key={day}
                                 type="button"
-                                className={`h-8 w-8 text-xs font-medium rounded transition-all ${
-                                  isAvailable
-                                    ? "text-gray-900 bg-green-50 hover:bg-green-100 hover:text-green-700 cursor-pointer border border-green-200"
-                                    : "text-gray-300 bg-red-50 cursor-not-allowed"
+                                className={`h-10 rounded-lg text-sm font-medium transition-all ${
+                                  isSelected
+                                    ? "bg-[#16305B] text-white shadow-md"
+                                    : isAvailable
+                                    ? "text-gray-900 hover:bg-blue-50 border border-gray-200"
+                                    : "text-gray-300 bg-gray-50 cursor-not-allowed"
                                 } ${
-                                  isTodayDate && isAvailable
-                                    ? "bg-blue-500 text-white hover:bg-blue-600 border-blue-500"
+                                  isTodayDate && !isSelected
+                                    ? "border-2 border-[#16305B]"
                                     : ""
                                 }`}
                                 disabled={!isAvailable}
@@ -504,124 +467,126 @@ export default function ScheduleTrialPage() {
                             );
                           })}
                         </div>
+                      </div>
 
-                        <div className="mt-4 flex gap-4 text-xs text-gray-600">
-                          <div className="flex items-center gap-1">
-                            <div className="w-4 h-4 bg-green-50 border border-green-200 rounded"></div>
-                            <span>Available</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <div className="w-4 h-4 bg-red-50 rounded"></div>
-                            <span>Blocked</span>
-                          </div>
+                      {/* Legend */}
+                      <div className="flex gap-4 text-xs text-gray-600 mt-6 pt-6 border-t border-gray-200">
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 border-2 border-[#16305B] rounded"></div>
+                          <span>Today</span>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-4 h-4 bg-gray-50 border border-gray-200 rounded"></div>
+                          <span>Unavailable</span>
+                        </div>
+                      </div>
+                    </div>
 
-                        <div className="mt-8">
-                          <div className="text-sm font-medium text-gray-700 mb-2">Time zone</div>
-                          <div className="flex items-center text-sm text-gray-600">
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span>Central European Time (8:11pm)</span>
-                            <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
+                    {/* Right Side - Time Selection or Details */}
+                    <div className="p-8 bg-gray-50">
+                      {!selectedDate ? (
+                        <div className="flex flex-col items-center justify-center h-full text-center">
+                          <Calendar className="w-16 h-16 text-gray-300 mb-4" />
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">Select a Date</h3>
+                          <p className="text-gray-600 text-sm">
+                            Choose an available date from the calendar to see time slots
+                          </p>
                         </div>
-                      </>
-                    ) : !showDetails ? (
-                      <>
-                        <div className="mb-6">
-                          <h3 className="text-xl font-semibold text-gray-900 mb-2">Select a Date & Time</h3>
-                          <p className="text-blue-600 font-medium">{formatDisplayDate(selectedDate).split(',')[0]}, {getMonthName(selectedDate.getMonth())} {selectedDate.getDate()}</p>
-                        </div>
-                        
-                        {availableTimeSlots.length === 0 ? (
-                          <div className="text-center py-8 text-gray-500">
-                            <p className="font-medium">No available time slots for this date</p>
-                            <button
-                              className="mt-4 text-blue-600 underline"
-                              onClick={() => setSelectedDate(null)}
-                            >
-                              Choose a different date
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto pr-2">
-                            {availableTimeSlots.map((slot) => (
-                              <button
-                                key={slot}
-                                type="button"
-                                className={`py-3 px-4 text-center border rounded-lg font-medium transition-all ${
-                                  selectedTime === slot
-                                    ? "bg-blue-500 text-white border-blue-500"
-                                    : "bg-white text-blue-600 border-blue-200 hover:border-blue-300 hover:bg-blue-50"
-                                }`}
-                                onClick={() => handleTimeSelect(slot)}
-                              >
-                                {slot}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-
-                        <div className="mt-8">
-                          <div className="text-sm font-medium text-gray-700 mb-2">Time zone</div>
-                          <div className="flex items-center text-sm text-gray-600">
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span>Central European Time (8:11pm)</span>
-                            <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="mb-6">
-                          <h3 className="text-xl font-semibold text-gray-900 mb-2">Enter details</h3>
-                        </div>
-                        
-                        <div className="space-y-4 mb-6">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-                            <input
-                              type="text"
-                              value={name}
-                              onChange={(e) => setName(e.target.value)}
-                              className="w-full px-4 py-3 text-gray-700 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder="Enter your name"
-                            />
+                      ) : !showDetails ? (
+                        <>
+                          <div className="mb-6">
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">Select Time</h3>
+                            <p className="text-sm text-gray-600">
+                              {formatDisplayDate(selectedDate)}
+                            </p>
                           </div>
                           
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                            <input
-                              type="email"
-                              value={email}
-                              onChange={(e) => setEmail(e.target.value)}
-                              className="w-full px-4 py-3 text-gray-700 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder="Enter your email"
-                            />
+                          {availableTimeSlots.length === 0 ? (
+                            <div className="text-center py-12">
+                              <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                              <p className="text-gray-600 font-medium mb-4">No available time slots</p>
+                              <button
+                                className="text-[#16305B] font-medium underline"
+                                onClick={() => setSelectedDate(null)}
+                              >
+                                Choose a different date
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-2">
+                              {availableTimeSlots.map((slot) => (
+                                <button
+                                  key={slot}
+                                  type="button"
+                                  className={`py-3 px-4 text-center border-2 rounded-lg font-medium transition-all ${
+                                    selectedTime === slot
+                                      ? "bg-[#16305B] text-white border-[#16305B] shadow-md"
+                                      : "bg-white text-gray-900 border-gray-200 hover:border-[#16305B] hover:bg-blue-50"
+                                  }`}
+                                  onClick={() => handleTimeSelect(slot)}
+                                >
+                                  {slot}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <div className="mb-6">
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">Enter Details</h3>
+                            <div className="flex items-center gap-2 text-sm text-gray-600">
+                              <Calendar className="w-4 h-4" />
+                              <span>{formatDisplayDate(selectedDate)}</span>
+                              <span className="mx-2">•</span>
+                              <Clock className="w-4 h-4" />
+                              <span>{selectedTime}</span>
+                            </div>
                           </div>
-                        </div>
-                        
-                        <div className="text-xs text-gray-500 mb-6">
-                          By proceeding, you confirm that you have read and agree to <span className="text-blue-600 underline">Calendly's Terms of Use</span> and <span className="text-blue-600 underline">Privacy Notice</span>.
-                        </div>
-                        
-                        <button
-                          type="button"
-                          className="w-full bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={!name || !email}
-                          onClick={handleSchedule}
-                        >
-                          Schedule Event
-                        </button>
-                      </>
-                    )}
+                          
+                          <div className="space-y-4 mb-6">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Name <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                className="w-full px-4 py-3 text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#16305B] focus:border-transparent"
+                                placeholder="Enter your full name"
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Email <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                type="email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full px-4 py-3 text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#16305B] focus:border-transparent"
+                                placeholder="Enter your email"
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="text-xs text-gray-500 mb-6 p-3 bg-gray-100 rounded-lg">
+                            By proceeding, you confirm that you agree to our Terms of Use and Privacy Policy.
+                          </div>
+                          
+                          <button
+                            type="button"
+                            className="w-full bg-[#16305B] text-white font-semibold py-3 px-6 rounded-lg hover:bg-[#0A2342] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={!name || !email}
+                            onClick={handleSchedule}
+                          >
+                            Schedule Trial
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

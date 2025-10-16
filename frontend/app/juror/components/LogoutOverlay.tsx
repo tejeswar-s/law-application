@@ -10,6 +10,20 @@ interface LogoutOverlayProps {
 
 export default function LogoutOverlay({ open, onClose, onSignOut }: LogoutOverlayProps) {
   if (!open) return null;
+
+  const handleSignOut = () => {
+    // Clear signup draft data for both attorney and juror
+    try {
+      localStorage.removeItem('attorneySignupDraft');
+      localStorage.removeItem('jurorSignupDraft');
+    } catch (error) {
+      console.warn('Failed to clear signup drafts:', error);
+    }
+    
+    // Call the original signOut handler
+    onSignOut();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
       <div className="bg-white rounded-xl shadow-xl p-8 min-w-[340px] max-w-[95vw] relative">
@@ -31,7 +45,7 @@ export default function LogoutOverlay({ open, onClose, onSignOut }: LogoutOverla
           </button>
           <button
             className="px-5 py-2 rounded bg-[#0C2D57] text-white font-semibold hover:bg-[#0a2342]"
-            onClick={onSignOut}
+            onClick={handleSignOut}
           >
             Sign out
           </button>
@@ -39,4 +53,4 @@ export default function LogoutOverlay({ open, onClose, onSignOut }: LogoutOverla
       </div>
     </div>
   );
-}
+} 

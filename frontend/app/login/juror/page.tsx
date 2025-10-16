@@ -26,7 +26,6 @@ export default function JurorLogin() {
       .find(p => p.startsWith("token="))
       ?.split("=")[1];
     if (!token) return;
-    // Optimistic client-side redirect; optionally verify with backend
     fetch(`${API_BASE}/api/auth/verify-token`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}` },
@@ -37,9 +36,7 @@ export default function JurorLogin() {
           router.replace("/juror");
         }
       })
-      .catch(() => {
-        // Ignore invalid token; stay on login
-      });
+      .catch(() => {});
   }, [router]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -54,8 +51,17 @@ export default function JurorLogin() {
       });
       const data = await res.json();
       if (res.ok && data.token) {
-        // Store token in cookie (for SSR, use httpOnly cookie via backend)
+        // Store token in cookie
         document.cookie = `token=${data.token}; path=/;`;
+        
+        // Clear signup drafts after successful login
+        try {
+          localStorage.removeItem('attorneySignupDraft');
+          localStorage.removeItem('jurorSignupDraft');
+        } catch (error) {
+          console.warn('Failed to clear signup drafts:', error);
+        }
+        
         router.push("/juror");
       } else {
         setError(data.message || "Invalid email or password");

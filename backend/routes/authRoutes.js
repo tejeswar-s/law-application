@@ -12,13 +12,17 @@ const {
   sendJurorEmailVerification,
   verifyEmailVerificationToken,
   sendAttorneyEmailVerification,
+  sendAttorneyOTP,
+  verifyAttorneyOTP,
+  sendJurorOTP, // NEW
+  verifyJurorOTP, // NEW
 } = require("../controllers/authController");
 const { authMiddleware } = require("../middleware/authMiddleware");
 
 // Rate limiting for auth endpoints
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 5,
   message: {
     error: "Too many authentication attempts, please try again later.",
   },
@@ -27,8 +31,8 @@ const authLimiter = rateLimit({
 });
 
 const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Allow more login attempts than signup
+  windowMs: 15 * 60 * 1000,
+  max: 10,
   message: {
     error: "Too many login attempts, please try again later.",
   },
@@ -36,10 +40,9 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Password reset rate limiting (more restrictive)
 const passwordResetLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 3, // only 3 requests per 15 minutes
+  windowMs: 15 * 60 * 1000,
+  max: 3,
   message: {
     error: "Too many password reset attempts, please try again later.",
   },
@@ -78,16 +81,22 @@ router.post(
 );
 router.get("/verify-email-token", verifyEmailVerificationToken);
 
-// Token verification - both POST and GET methods
+// Attorney OTP verification routes
+router.post("/attorney/send-otp", authLimiter, sendAttorneyOTP);
+router.post("/attorney/verify-otp", authLimiter, verifyAttorneyOTP);
+
+// Juror OTP verification routes (NEW)
+router.post("/juror/send-otp", authLimiter, sendJurorOTP);
+router.post("/juror/verify-otp", authLimiter, verifyJurorOTP);
+
+// Token verification
 router.post("/verify-token", verifyToken);
 router.get("/verify-token", verifyToken);
 
-// Protected route example - get current user info
+// Protected route - get current user info
 router.get("/me", authMiddleware, async (req, res) => {
   try {
-    // authMiddleware adds user info to req.user
     const { user } = req;
-
     res.json({
       success: true,
       user: {
@@ -95,7 +104,7 @@ router.get("/me", authMiddleware, async (req, res) => {
         email: user.email,
         type: user.type,
         verified: user.verified,
-        ...user, // includes other user-specific fields
+        ...user,
       },
     });
   } catch (error) {
