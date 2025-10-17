@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "postinstall": "npm run build"
   },
   "dependencies": {
     "@azure/communication-calling": "^1.38.1",
