@@ -75,6 +75,7 @@ export default function PaymentDetailsPage() {
                 >
                   <option value="">Select Method</option>
                   <option value="Credit Card">Credit Card</option>
+                  <option value="Debit Card">Debit Card</option>
                   <option value="Bank Transfer">Bank Transfer</option>
                 </select>
                 {validationErrors.paymentMethod && (
@@ -85,13 +86,16 @@ export default function PaymentDetailsPage() {
                 <label className="block mb-1 text-[#16305B] font-medium">
                   Payment Amount <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="number"
+                <select
                   value={paymentAmount}
                   onChange={e => setPaymentAmount(e.target.value)}
-                  placeholder="Payment Amount"
                   className="w-full px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
-                />
+                >
+                  <option value="">Select Amount</option>
+                  <option value="2500">$2,500</option>
+                  <option value="3000">$3,000</option>
+                  <option value="4000">$4,000</option>
+                </select>
                 {validationErrors.paymentAmount && (
                   <p className="text-red-500 text-sm mt-1">{validationErrors.paymentAmount}</p>
                 )}

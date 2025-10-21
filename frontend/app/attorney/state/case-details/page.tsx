@@ -35,12 +35,13 @@ export default function CaseDetailsPage() {
       try {
         const res = await fetch("https://api.census.gov/data/2020/dec/pl?get=NAME&for=state:*");
         const data = await res.json();
-        setAvailableStates(
-          data.slice(1).map((row: [string, string]) => ({
-            label: row[0],
-            value: row[1]
-          }))
-        );
+        const states = data.slice(1).map((row: [string, string]) => ({
+          label: row[0],
+          value: row[1]
+        }));
+        // Sort states alphabetically by label
+        states.sort((a, b) => a.label.localeCompare(b.label));
+        setAvailableStates(states);
       } catch (error) {
         setAvailableStates([]);
       }
@@ -210,9 +211,9 @@ export default function CaseDetailsPage() {
                   className="w-full px-4 py-2 border border-[#bfc6d1] rounded-md bg-white text-[#16305B] focus:outline-[#16305B]"
                 >
                   <option value="">Select Trial Case Tier</option>
-                  <option value="Tier 1">Tier 1</option>
-                  <option value="Tier 2">Tier 2</option>
-                  <option value="Tier 3">Tier 3</option>
+                  <option value="Tier 1">Tier 1 - 2.5 hours, $2,500</option>
+                  <option value="Tier 2">Tier 2 - 3.0 hours, $3,000</option>
+                  <option value="Tier 3">Tier 3 - 4.0 hours, $4,000</option>
                 </select>
                 {validationErrors.caseTier && (
                   <p className="text-red-500 text-sm mt-1">{validationErrors.caseTier}</p>

@@ -99,7 +99,7 @@ export default function VoirDirePart2() {
               {questions.map((q, idx) => (
                 <div key={idx} className="mb-4">
                   <label className="block mb-1 text-[#16305B] font-medium">
-                    Question #{idx + 1} <span className="text-red-500">*</span>
+                    Question No. {idx + 1} <span className="text-red-500">*</span>
                   </label>
                   <div className="flex gap-2">
                     <input

@@ -394,7 +394,7 @@ async function jurorSignup(req, res) {
     }
 
     // Validate payment method
-    const validPaymentMethods = ["venmo", "paypal", "cashapp"];
+    const validPaymentMethods = ["venmo", "paypal", "cashapp","zelle"];
     if (!validPaymentMethods.includes(paymentMethod)) {
       return res
         .status(400)

@@ -361,7 +361,7 @@ export default function ScheduleTrialPage() {
                         <div>
                           <div className="text-sm text-gray-600">Location</div>
                           <div className="font-medium text-gray-900">
-                            {localStorage.getItem("county") || "County"}, {localStorage.getItem("state") || "State"}
+                            {localStorage.getItem("county") || "County, State"}
                           </div>
                         </div>
                       </div>

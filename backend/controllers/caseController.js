@@ -23,6 +23,10 @@ const VOIR_DIRE_PART_1 = [
 /**
  * Create new case (Attorney submits case)
  */
+/**
+ * Create new case (Attorney submits case)
+ * FIXED: Now properly saves voirDire2Questions
+ */
 async function createCase(req, res) {
   try {
     const attorneyId = req.user.id;
@@ -33,11 +37,12 @@ async function createCase(req, res) {
     console.log("Type:", typeof voirDire2Questions);
     console.log("Is Array:", Array.isArray(voirDire2Questions));
 
+    // FIX: Use the actual voirDire2Questions from the request, not an empty array
     const caseData = {
       ...restOfBody,
       attorneyId,
       voirDire1Questions: VOIR_DIRE_PART_1,
-      voirDire2Questions: [],
+      voirDire2Questions: voirDire2Questions || [], // Use the actual questions!
     };
 
     // Validate required fields
@@ -58,11 +63,11 @@ async function createCase(req, res) {
       });
     }
 
-    // Create the case
+    // Create the case (now with voirDire2Questions included)
     const caseId = await Case.createCase(caseData);
     console.log("Case created with ID:", caseId);
 
-    // Insert Part 2 questions into WarRoomVoirDire table
+    // Insert Part 2 questions into WarRoomVoirDire table (if needed for war room functionality)
     if (
       voirDire2Questions &&
       Array.isArray(voirDire2Questions) &&

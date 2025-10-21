@@ -69,17 +69,15 @@ export function Step2PersonalDetails({
   const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({});
   const isMarried = formData.personalDetails1.maritalStatus === "Married";
 
-  // Auto-fill "Not Applicable" when not married
+  // Auto-fill "Not Applicable" for spouse fields when not married
   useEffect(() => {
     if (!isMarried) {
       if (formData.personalDetails1.spouseEmployer !== "Not Applicable" ||
-          formData.personalDetails1.employerName !== "Not Applicable" ||
           formData.personalDetails1.employerAddress !== "Not Applicable") {
         onUpdate({
           personalDetails1: {
             ...formData.personalDetails1,
             spouseEmployer: "Not Applicable",
-            employerName: "Not Applicable",
             employerAddress: "Not Applicable"
           }
         });
@@ -143,15 +141,18 @@ export function Step2PersonalDetails({
       errors.maritalStatus = "Please select your marital status";
     }
     
+    // Applicant's employer is always required
+    if (!formData.personalDetails1.employerName || formData.personalDetails1.employerName.trim() === "") {
+      errors.employerName = "Please enter your employer name";
+    }
+    
+    // Spouse fields only required if married
     if (isMarried) {
       if (!formData.personalDetails1.spouseEmployer || formData.personalDetails1.spouseEmployer.trim() === "") {
         errors.spouseEmployer = "Please enter spouse employer name";
       }
       if (!formData.personalDetails1.employerAddress || formData.personalDetails1.employerAddress.trim() === "") {
         errors.employerAddress = "Please enter spouse employer address";
-      }
-      if (!formData.personalDetails1.employerName || formData.personalDetails1.employerName.trim() === "") {
-        errors.employerName = "Please enter your employer name";
       }
     }
     
@@ -225,6 +226,34 @@ export function Step2PersonalDetails({
             )}
           </div>
 
+          {/* UPDATED: Applicant's Employment - Always Required */}
+          <div className={`bg-white rounded-xl border-2 p-6 shadow-sm ${fieldErrors.employerName ? 'border-red-300' : 'border-gray-200'}`}>
+            <h3 className="text-lg font-semibold text-[#0A2342] mb-4">Your Employment Information</h3>
+            
+            <FormField label="Your Current Employer Name" required>
+              <TextInput
+                placeholder="e.g., Lone Star Innovations LLC"
+                value={formData.personalDetails1.employerName}
+                onChange={(val) => {
+                  onUpdate({
+                    personalDetails1: { ...formData.personalDetails1, employerName: val }
+                  });
+                  clearFieldError('employerName');
+                }}
+                hasError={!!fieldErrors.employerName}
+              />
+            </FormField>
+            {fieldErrors.employerName && (
+              <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                {fieldErrors.employerName}
+              </p>
+            )}
+          </div>
+
+          {/* Spouse Information - Only shown if married */}
           {isMarried && (
             <div className="bg-blue-50 rounded-xl border-2 border-blue-200 p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-[#0A2342] mb-4">Spouse Information</h3>
@@ -281,33 +310,6 @@ export function Step2PersonalDetails({
             </div>
           )}
 
-          <div className={`bg-white rounded-xl border-2 p-6 shadow-sm ${fieldErrors.employerName ? 'border-red-300' : 'border-gray-200'}`}>
-            <h3 className="text-lg font-semibold text-[#0A2342] mb-4">Employment Information</h3>
-            
-            <FormField label="Your Employer Name" required>
-              <TextInput
-                placeholder={isMarried ? "e.g., Lone Star Innovations LLC" : "Not Applicable (only required if married)"}
-                value={formData.personalDetails1.employerName}
-                onChange={(val) => {
-                  onUpdate({
-                    personalDetails1: { ...formData.personalDetails1, employerName: val }
-                  });
-                  clearFieldError('employerName');
-                }}
-                disabled={!isMarried}
-                hasError={!!fieldErrors.employerName}
-              />
-            </FormField>
-            {fieldErrors.employerName && (
-              <p className="text-red-500 text-sm mt-2 flex items-center gap-1">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                {fieldErrors.employerName}
-              </p>
-            )}
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className={`bg-white rounded-xl border-2 p-6 shadow-sm ${fieldErrors.yearsInCounty ? 'border-red-300' : 'border-gray-200'}`}>
               <FormField label="Years in County" required>
@@ -333,6 +335,7 @@ export function Step2PersonalDetails({
               )}
             </div>
 
+            {/* UPDATED: Age Range - Extended to 70+ */}
             <div className={`bg-white rounded-xl border-2 p-6 shadow-sm ${fieldErrors.ageRange ? 'border-red-300' : 'border-gray-200'}`}>
               <FormField label="Age Range" required>
                 <Select
@@ -343,7 +346,7 @@ export function Step2PersonalDetails({
                     });
                     clearFieldError('ageRange');
                   }}
-                  options={["18-24", "25-29", "30-39", "40-49", "50-59", "60+"]}
+                  options={["18-24", "25-29", "30-39", "40-49", "50-59", "60-69", "70+"]}
                   placeholder="Select age range"
                 />
               </FormField>
@@ -567,6 +570,7 @@ export function Step2PersonalDetails({
           </FormField>
         </div>
 
+        {/* UPDATED: Payment Methods - Added Zelle */}
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200 p-6 shadow-sm">
           <FormField
             label="Select Payment Method"
@@ -574,7 +578,7 @@ export function Step2PersonalDetails({
             validationErrors={validationErrors}
             fieldName="paymentMethod"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
               <PaymentMethodButton
                 label="Venmo"
                 selected={formData.paymentMethod === "venmo"}
@@ -598,6 +602,15 @@ export function Step2PersonalDetails({
                 selected={formData.paymentMethod === "cashapp"}
                 onClick={() => {
                   onUpdate({ paymentMethod: "cashapp" });
+                  onClearError('paymentMethod');
+                }}
+                icon={<CreditCard size={20} className="text-[#0A2342]" />}
+              />
+              <PaymentMethodButton
+                label="Zelle"
+                selected={formData.paymentMethod === "zelle"}
+                onClick={() => {
+                  onUpdate({ paymentMethod: "zelle" });
                   onClearError('paymentMethod');
                 }}
                 icon={<CreditCard size={20} className="text-[#0A2342]" />}

@@ -11,7 +11,51 @@ const {
 } = require("@azure/storage-blob");
 
 const router = express.Router();
-const upload = multer();
+
+// Configure multer with file size limit and file filter
+const upload = multer({
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB limit (increased for video support)
+  },
+  fileFilter: (req, file, cb) => {
+    // Allowed MIME types
+    const allowedMimeTypes = [
+      // Images
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'image/svg+xml',
+      'image/bmp',
+      // Videos
+      'video/mp4',
+      'video/mpeg',
+      'video/quicktime', // .mov
+      'video/x-msvideo', // .avi
+      'video/x-ms-wmv', // .wmv
+      'video/webm',
+      'video/x-flv', // .flv
+      'video/3gpp', // .3gp
+      // Documents
+      'application/pdf',
+      'application/msword', // .doc
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+      'application/vnd.ms-excel', // .xls
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+      'application/vnd.ms-powerpoint', // .ppt
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
+      'text/plain',
+      'text/csv',
+    ];
+
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type ${file.mimetype} is not supported`));
+    }
+  }
+});
 
 // Helper function to generate SAS URL
 async function generateSasUrl(fileUrl) {
@@ -50,6 +94,51 @@ async function generateSasUrl(fileUrl) {
   }
 }
 
+// Helper function to detect file type
+function detectFileType(filename, mimetype) {
+  const fileExt = path.extname(filename).toLowerCase();
+  
+  // Image types
+  if ([".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp"].includes(fileExt)) {
+    return "image";
+  }
+  
+  // Video types
+  if ([".mp4", ".mpeg", ".mov", ".avi", ".wmv", ".webm", ".flv", ".3gp"].includes(fileExt) ||
+      mimetype.startsWith("video/")) {
+    return "video";
+  }
+  
+  // PDF
+  if (fileExt === ".pdf") {
+    return "pdf";
+  }
+  
+  // Word documents
+  if ([".doc", ".docx"].includes(fileExt) || 
+      mimetype === "application/msword" || 
+      mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    return "word";
+  }
+  
+  // Excel documents
+  if ([".xls", ".xlsx"].includes(fileExt) ||
+      mimetype === "application/vnd.ms-excel" ||
+      mimetype === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
+    return "excel";
+  }
+  
+  // PowerPoint documents
+  if ([".ppt", ".pptx"].includes(fileExt) ||
+      mimetype === "application/vnd.ms-powerpoint" ||
+      mimetype === "application/vnd.openxmlformats-officedocument.presentationml.presentation") {
+    return "powerpoint";
+  }
+  
+  // Default to document
+  return "document";
+}
+
 // POST - Upload document
 router.post(
   "/cases/:caseId/documents",
@@ -59,11 +148,20 @@ router.post(
     const { description } = req.body;
     const file = req.file;
 
+    console.log("=== DOCUMENT UPLOAD DEBUG ===");
+    console.log("Case ID:", caseId);
+    console.log("File received:", file ? file.originalname : "No file");
+    console.log("File size:", file ? file.size : "N/A");
+    console.log("MIME type:", file ? file.mimetype : "N/A");
+    console.log("Description:", description);
+
     if (!file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
     try {
+      console.log("Uploading to Azure Blob Storage...");
+      
       // Upload to Azure Blob
       const fileUrl = await uploadToBlob(
         file.buffer,
@@ -71,22 +169,15 @@ router.post(
         file.mimetype
       );
 
-      // Detect type from extension
-      const fileExt = path.extname(file.originalname).toLowerCase();
-      let type = "document";
-      if (
-        [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp"].includes(
-          fileExt
-        )
-      ) {
-        type = "image";
-      } else if (fileExt === ".pdf") {
-        type = "pdf";
-      }
+      console.log("Upload successful! File URL:", fileUrl);
+
+      // Detect type from extension and MIME type
+      const type = detectFileType(file.originalname, file.mimetype);
+      console.log("Detected file type:", type);
 
       // Save to database
       const pool = await poolPromise;
-      await pool
+      const result = await pool
         .request()
         .input("caseId", caseId)
         .input("type", type)
@@ -99,6 +190,8 @@ router.post(
         VALUES (@caseId, @type, @fileName, @fileUrl, @description, @size, @mimeType, GETUTCDATE())
       `);
 
+      console.log("Database insert successful!");
+
       res.json({
         success: true,
         message: "File uploaded successfully",
@@ -107,8 +200,19 @@ router.post(
         type,
       });
     } catch (err) {
-      console.error("Document upload error:", err);
-      res.status(500).json({ error: err.message });
+      console.error("=== DOCUMENT UPLOAD ERROR ===");
+      console.error("Error message:", err.message);
+      console.error("Error stack:", err.stack);
+      console.error("File details:", {
+        name: file.originalname,
+        size: file.size,
+        mimetype: file.mimetype
+      });
+      
+      res.status(500).json({ 
+        error: err.message,
+        details: "Failed to upload document. Check server logs for details."
+      });
     }
   }
 );

@@ -267,7 +267,7 @@ function validateJurorData(data) {
   const errors = [];
 
   // Validate payment method
-  const validPaymentMethods = ['venmo', 'paypal', 'cashapp'];
+  const validPaymentMethods = ['venmo', 'paypal', 'cashapp', 'zelle'];
   if (!data.paymentMethod) {
     errors.push('Payment method is required');
   } else if (!validPaymentMethods.includes(data.paymentMethod.toLowerCase())) {

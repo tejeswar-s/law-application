@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Law App",
+  title: "Quick Verdicts",
   description: "A virtual courtroom where justice moves fast",
 };
 

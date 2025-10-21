@@ -49,15 +49,18 @@ function JurorSignupInner() {
   useEffect(() => {
     async function fetchStates() {
       try {
-        const res = await fetch(`https://api.census.gov/data/2020/dec/pl?get=NAME&for=state:*`);
-        const data = await res.json();
-        setAvailableStates(data.slice(1).map((row: [string, string]) => ({
-          label: row[0],
-          value: row[1]
-        })));
-      } catch (error) {
-        console.error('Error fetching states:', error);
-      }
+      const res = await fetch(`https://api.census.gov/data/2020/dec/pl?get=NAME&for=state:*`);
+      const data = await res.json();
+      const states = data.slice(1).map((row: [string, string]) => ({
+        label: row[0],
+        value: row[1]
+      }));
+      // Sort states alphabetically by label
+      states.sort((a, b) => a.label.localeCompare(b.label));
+      setAvailableStates(states);
+    } catch (error) {
+      console.error('Error fetching states:', error);
+    }
     }
     fetchStates();
   }, []);

@@ -146,6 +146,12 @@ export default function CaseDetailsPage() {
   const voirDire1 = parseJsonSafely(caseData.VoirDire1Questions);
   const voirDire2 = parseJsonSafely(caseData.VoirDire2Questions);
 
+  // Debug logging for voir dire questions
+  console.log("VoirDire1 raw:", caseData.VoirDire1Questions);
+  console.log("VoirDire1 parsed:", voirDire1);
+  console.log("VoirDire2 raw:", caseData.VoirDire2Questions);
+  console.log("VoirDire2 parsed:", voirDire2);
+
   return (
     <div className="flex min-h-screen bg-[#F7F6F3]">
       <AttorneySidebar selectedSection="cases" onSectionChange={() => {}} />
@@ -172,7 +178,7 @@ export default function CaseDetailsPage() {
                   onClick={() => router.push(`/attorney/cases/${caseId}/war-room`)}
                   className="bg-[#16305B] text-white px-6 py-2 rounded font-semibold hover:bg-[#1e417a]"
                 >
-                  Open War Room
+                  Enter Case Room
                 </button>
               </div>
             </div>
@@ -186,7 +192,7 @@ export default function CaseDetailsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-sm font-semibold text-gray-600">Case Type</label>
-                  <p className="text-[#363636] mt-1">{caseData.CaseType}</p>
+                  <p className="text-[#363636] mt-1 uppercase font-bold">{caseData.CaseType}</p>
                 </div>
                 <div>
                   <label className="text-sm font-semibold text-gray-600">Case Tier</label>
@@ -278,9 +284,7 @@ export default function CaseDetailsPage() {
                     ))}
                     <p className="text-sm font-semibold text-gray-600 mt-2 mb-1">Defendants:</p>
                     {group.defendants?.map((d: any, i: number) => (
-                      <p key={i} className="text-[#363636] ml-2">
-                        {d.name} ({d.email})
-                      </p>
+                      <p key={i} className="text-[#363636] ml-2">{d.name}</p>
                     ))}
                   </div>
                 </div>
@@ -291,20 +295,28 @@ export default function CaseDetailsPage() {
             <section className="bg-white rounded-lg shadow p-6">
               <h2 className="text-xl font-bold text-[#16305B] mb-4">Voir Dire Questions</h2>
               <div className="mb-4">
-                <h3 className="font-semibold text-[#16305B] mb-2">Part 1 (Standard)</h3>
-                <ul className="list-disc ml-6 space-y-1 text-[#363636]">
-                  {voirDire1.map((q: string, i: number) => (
-                    <li key={i}>{q}</li>
-                  ))}
-                </ul>
+                <h3 className="font-semibold text-[#16305B] mb-2">Standard Questions</h3>
+                {voirDire1 && voirDire1.length > 0 ? (
+                  <ul className="list-disc ml-6 space-y-1 text-[#363636]">
+                    {voirDire1.map((q: string, i: number) => (
+                      <li key={i}>{q}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-500 italic ml-2">No standard questions available</p>
+                )}
               </div>
               <div>
-                <h3 className="font-semibold text-[#16305B] mb-2">Part 2 (Custom)</h3>
-                <ul className="list-disc ml-6 space-y-1 text-[#363636]">
-                  {voirDire2.map((q: string, i: number) => (
-                    <li key={i}>{q}</li>
-                  ))}
-                </ul>
+                <h3 className="font-semibold text-[#16305B] mb-2">Custom Questions</h3>
+                {voirDire2 && voirDire2.length > 0 ? (
+                  <ul className="list-disc ml-6 space-y-1 text-[#363636]">
+                    {voirDire2.map((q: string, i: number) => (
+                      <li key={i}>{q}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-500 italic ml-2">No custom questions added</p>
+                )}
               </div>
             </section>
           </div>
