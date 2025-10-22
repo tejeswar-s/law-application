@@ -114,6 +114,22 @@ export function Step1CriteriaVerification({
       
       <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
         <Question 
+          label="Have you been convicted of a felony within the past ten (10) years for which your rights have not been restored?" 
+          name="felony" 
+          value={formData.criteriaAnswers.felony}
+          onChange={(value) => handleCriteriaChange('felony', value)}
+          error={validationErrors['criteriaAnswers.felony']}
+        />
+        
+        <Question 
+          label="Are you currently under indictment for or charged with a felony?" 
+          name="indictment" 
+          value={formData.criteriaAnswers.indictment}
+          onChange={(value) => handleCriteriaChange('indictment', value)}
+          error={validationErrors['criteriaAnswers.indictment']}
+        />
+        
+        <Question 
           label="Are you at least 18 years old?" 
           name="age" 
           value={formData.criteriaAnswers.age}
@@ -143,22 +159,6 @@ export function Step1CriteriaVerification({
           value={formData.criteriaAnswers.work2}
           onChange={(value) => handleCriteriaChange('work2', value)}
           error={validationErrors['criteriaAnswers.work2']}
-        />
-        
-        <Question 
-          label="Have you been convicted of a felony or other disqualifying offense (and if so, has your right to serve been restored)?" 
-          name="felony" 
-          value={formData.criteriaAnswers.felony}
-          onChange={(value) => handleCriteriaChange('felony', value)}
-          error={validationErrors['criteriaAnswers.felony']}
-        />
-        
-        <Question 
-          label="Are you currently under indictment or legal charges for a felony?" 
-          name="indictment" 
-          value={formData.criteriaAnswers.indictment}
-          onChange={(value) => handleCriteriaChange('indictment', value)}
-          error={validationErrors['criteriaAnswers.indictment']}
         />
         
         {validationErrors['criteriaAnswers.eligibility'] && (

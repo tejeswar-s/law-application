@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertCircle, Calendar, Briefcase } from "lucide-react";
+import { format, parseISO, isToday } from "date-fns";
+
 const AttorneyHelp = dynamic(() => import("./AttorneyHelp"), { ssr: false });
 const AttorneyContact = dynamic(() => import("./AttorneyContact"), { ssr: false });
 
@@ -21,11 +23,33 @@ type AttorneyUser = {
   verificationStatus: string;
 };
 
+type Case = {
+  Id: number;
+  PlaintiffGroups: string;
+  DefendantGroups: string;
+  ScheduledDate: string;
+  ScheduledTime: string;
+  attorneyEmail: string;
+  status?: string;
+};
+
 function getCookie(name: string) {
   const value = `; ${document.cookie}`;
   const parts = value.split(`; ${name}=`);
   if (parts.length === 2) return parts.pop()?.split(';').shift();
   return null;
+}
+
+function getCaseName(plaintiffGroups: string, defendantGroups: string) {
+  try {
+    const plaintiffs = JSON.parse(plaintiffGroups);
+    const defendants = JSON.parse(defendantGroups);
+    const plaintiffName = plaintiffs[0]?.plaintiffs?.[0]?.name || "Plaintiff";
+    const defendantName = defendants[0]?.defendants?.[0]?.name || "Defendant";
+    return `${plaintiffName} v. ${defendantName}`;
+  } catch {
+    return "Case";
+  }
 }
 
 // Introductory Slider Component for Unverified Attorneys
@@ -124,7 +148,9 @@ function IntroductorySlider() {
 
 export default function AttorneyHomeSection() {
   const [user, setUser] = useState<AttorneyUser | null>(null);
+  const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
+  const [casesLoading, setCasesLoading] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showContact, setShowContact] = useState(false);
 
@@ -144,6 +170,55 @@ export default function AttorneyHomeSection() {
     }
   }, []);
 
+  useEffect(() => {
+    if (user && user.isVerified) {
+      fetchCases();
+    }
+  }, [user]);
+
+  const fetchCases = async () => {
+    if (!user) return;
+    
+    setCasesLoading(true);
+    try {
+      const token = getCookie("token");
+      const res = await fetch(`${API_BASE}/api/cases?userId=${encodeURIComponent(user.email)}`, {
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      
+      if (Array.isArray(data)) {
+        setCases(data);
+      } else {
+        setCases([]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch cases:", err);
+      setCases([]);
+    } finally {
+      setCasesLoading(false);
+    }
+  };
+
+  // Get upcoming events (cases with scheduled dates)
+  const getUpcomingEvents = () => {
+    return cases
+      .filter(c => c.ScheduledDate)
+      .sort((a, b) => {
+        const dateA = new Date(`${a.ScheduledDate}T${a.ScheduledTime || '00:00'}`);
+        const dateB = new Date(`${b.ScheduledDate}T${b.ScheduledTime || '00:00'}`);
+        return dateA.getTime() - dateB.getTime();
+      })
+      .slice(0, 5); // Show only first 5 upcoming events
+  };
+
+  // Get recent cases
+  const getRecentCases = () => {
+    return cases.slice(0, 5); // Show only first 5 cases
+  };
+
   if (loading) {
     return (
       <main className="flex-1 px-10 py-8 bg-[#F7F6F3] flex items-center justify-center min-h-screen">
@@ -161,7 +236,8 @@ export default function AttorneyHomeSection() {
   }
 
   const isVerified = user?.isVerified || false;
-  const verificationStatus = user?.verificationStatus || "pending";
+  const upcomingEvents = getUpcomingEvents();
+  const recentCases = getRecentCases();
 
   return (
     <main className="flex-1 px-10 py-8 bg-[#F7F6F3] transition-all duration-300 ease-in-out">
@@ -206,20 +282,70 @@ export default function AttorneyHomeSection() {
       {/* Cases Section Preview */}
       <section className="mb-8">
         <div className="flex justify-between items-center mb-4">
-          <div>
-            <h2 className="text-lg font-bold text-[#16305B]">Your Cases</h2>
-            <p className="text-sm text-[#6B7280]">
-              {isVerified ? "Manage and access your cases quickly" : "Available after verification"}
-            </p>
+          <div className="flex items-center gap-3">
+            <Briefcase className="text-[#16305B]" size={24} />
+            <div>
+              <h2 className="text-lg font-bold text-[#16305B]">Your Cases</h2>
+              <p className="text-sm text-[#6B7280]">
+                {isVerified ? "Manage and access your cases quickly" : "Available after verification"}
+              </p>
+            </div>
           </div>
         </div>
         
         {isVerified ? (
-          <div className="bg-white rounded shadow p-6">
-            <p className="text-gray-600 text-center">
-              Click on <span className="font-semibold text-[#16305B]">Cases</span> in the sidebar to view and manage your cases.
-            </p>
-          </div>
+          casesLoading ? (
+            <div className="bg-white rounded shadow p-12 flex justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-4 border-b-4 border-[#16305B]" />
+            </div>
+          ) : recentCases.length > 0 ? (
+            <div className="bg-white rounded-lg shadow">
+              <div className="divide-y">
+                {recentCases.map((caseItem) => (
+                  <div key={caseItem.Id} className="p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-900 mb-1">
+                          {getCaseName(caseItem.PlaintiffGroups, caseItem.DefendantGroups)}
+                        </h3>
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <span>Case #{caseItem.Id}</span>
+                          {caseItem.ScheduledDate && (
+                            <span className="flex items-center gap-1">
+                              <Calendar size={14} />
+                              {format(parseISO(caseItem.ScheduledDate), "MMM d, yyyy")}
+                              {caseItem.ScheduledTime && ` at ${caseItem.ScheduledTime}`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {caseItem.status && (
+                        <span className="px-3 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                          {caseItem.status}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-4 bg-gray-50 text-center border-t">
+                <p className="text-sm text-gray-600">
+                  Showing {recentCases.length} of {cases.length} cases. 
+                  <span className="font-semibold text-[#16305B] ml-1 cursor-pointer hover:underline">
+                    View all in Cases section →
+                  </span>
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded shadow p-12 text-center">
+              <Briefcase className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Cases Yet</h3>
+              <p className="text-gray-600">
+                You haven't created any cases yet. Click on <span className="font-semibold text-[#16305B]">Cases</span> in the sidebar to create your first case.
+              </p>
+            </div>
+          )
         ) : (
           <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
             <div className="max-w-md mx-auto">
@@ -248,23 +374,78 @@ export default function AttorneyHomeSection() {
         )}
       </section>
 
-      {/* Calendar Section Preview */}
+      {/* Calendar Section Preview - List View */}
       <section className="mb-8">
         <div className="flex justify-between items-center mb-4">
-          <div>
-            <h2 className="text-lg font-bold text-[#16305B]">Calendar & Events</h2>
-            <p className="text-sm text-[#6B7280]">
-              {isVerified ? "Track your upcoming trials and events" : "Available after verification"}
-            </p>
+          <div className="flex items-center gap-3">
+            <Calendar className="text-[#16305B]" size={24} />
+            <div>
+              <h2 className="text-lg font-bold text-[#16305B]">Upcoming Events</h2>
+              <p className="text-sm text-[#6B7280]">
+                {isVerified ? "Track your upcoming trials and events" : "Available after verification"}
+              </p>
+            </div>
           </div>
         </div>
         
         {isVerified ? (
-          <div className="bg-white rounded shadow p-6">
-            <p className="text-gray-600 text-center">
-              Click on <span className="font-semibold text-[#16305B]">Calendar</span> in the sidebar to view your schedule and upcoming events.
-            </p>
-          </div>
+          casesLoading ? (
+            <div className="bg-white rounded shadow p-12 flex justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-4 border-b-4 border-[#16305B]" />
+            </div>
+          ) : upcomingEvents.length > 0 ? (
+            <div className="bg-white rounded-lg shadow">
+              <div className="divide-y">
+                {upcomingEvents.map((event) => {
+                  let dateLabel = "Invalid date";
+                  try {
+                    const parsed = parseISO(event.ScheduledDate);
+                    if (!isNaN(parsed.getTime())) {
+                      dateLabel = isToday(parsed)
+                        ? `Today, ${format(parsed, "MMMM d")}`
+                        : format(parsed, "EEEE, MMMM d, yyyy");
+                    }
+                  } catch {
+                    // leave as "Invalid date"
+                  }
+
+                  return (
+                    <div key={event.Id} className="p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-start gap-3">
+                        <div className="text-sm font-medium text-[#16305B] w-24 flex-shrink-0 mt-1">
+                          {event.ScheduledTime}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-semibold text-gray-900 mb-1">
+                            {getCaseName(event.PlaintiffGroups, event.DefendantGroups)}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            {dateLabel} • Case #{event.Id}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="p-4 bg-gray-50 text-center border-t">
+                <p className="text-sm text-gray-600">
+                  Showing {upcomingEvents.length} upcoming events. 
+                  <span className="font-semibold text-[#16305B] ml-1 cursor-pointer hover:underline">
+                    View all in Calendar section →
+                  </span>
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded shadow p-12 text-center">
+              <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Upcoming Events</h3>
+              <p className="text-gray-600">
+                You don't have any scheduled events. Schedule cases to see them here.
+              </p>
+            </div>
+          )
         ) : (
           <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
             <div className="max-w-md mx-auto">

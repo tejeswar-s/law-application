@@ -56,7 +56,7 @@ function JurorSignupInner() {
         value: row[1]
       }));
       // Sort states alphabetically by label
-      states.sort((a, b) => a.label.localeCompare(b.label));
+      states.sort((a: LocationOption, b: LocationOption) => a.label.localeCompare(b.label));
       setAvailableStates(states);
     } catch (error) {
       console.error('Error fetching states:', error);

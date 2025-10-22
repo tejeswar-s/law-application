@@ -54,7 +54,7 @@ export default function AttorneyCalendarSection({ onBack }: AttorneyCalendarSect
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<"calendar" | "list">("calendar");
+  const [view, setView] = useState<"calendar" | "list">("list"); // Changed default to "list"
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -236,8 +236,8 @@ export default function AttorneyCalendarSection({ onBack }: AttorneyCalendarSect
                 <h3 className="font-semibold text-lg text-[#16305B] mb-4">{dateLabel}</h3>
                 <div className="space-y-3">
                   {grouped[date].map((event) => (
-                    <div key={event.Id} className="flex items-start gap-3 p-3 bg-gray-50 rounded">
-                      <div className="text-sm font-medium text-gray-600 w-20">
+                    <div key={event.Id} className="flex items-start gap-3 p-3 bg-gray-50 rounded hover:bg-gray-100 transition-colors">
+                      <div className="text-sm font-medium text-[#16305B] w-20 flex-shrink-0">
                         {event.ScheduledTime}
                       </div>
                       <div className="flex-1">
@@ -310,16 +310,6 @@ export default function AttorneyCalendarSection({ onBack }: AttorneyCalendarSect
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-600">View:</span>
           <button
-            onClick={() => setView("calendar")}
-            className={`px-4 py-2 rounded text-sm font-medium transition ${
-              view === "calendar"
-                ? "bg-[#16305B] text-white"
-                : "bg-white text-gray-700 hover:bg-gray-50"
-            }`}
-          >
-            Calendar
-          </button>
-          <button
             onClick={() => setView("list")}
             className={`px-4 py-2 rounded text-sm font-medium transition ${
               view === "list"
@@ -328,6 +318,16 @@ export default function AttorneyCalendarSection({ onBack }: AttorneyCalendarSect
             }`}
           >
             List
+          </button>
+          <button
+            onClick={() => setView("calendar")}
+            className={`px-4 py-2 rounded text-sm font-medium transition ${
+              view === "calendar"
+                ? "bg-[#16305B] text-white"
+                : "bg-white text-gray-700 hover:bg-gray-50"
+            }`}
+          >
+            Calendar
           </button>
         </div>
       </div>
@@ -339,7 +339,7 @@ export default function AttorneyCalendarSection({ onBack }: AttorneyCalendarSect
         </div>
       ) : (
         <div>
-          {view === "calendar" ? renderCalendar() : renderList()}
+          {view === "list" ? renderList() : renderCalendar()}
         </div>
       )}
     </main>
