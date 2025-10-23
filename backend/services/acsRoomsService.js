@@ -1,8 +1,15 @@
 const { RoomsClient } = require("@azure/communication-rooms");
-const { AzureCommunicationTokenCredential } = require("@azure/communication-common"); // ADD THIS
+const { CommunicationIdentityClient } = require("@azure/communication-identity");
+const { ChatClient } = require("@azure/communication-chat");
+const { AzureCommunicationTokenCredential } = require("@azure/communication-common");
 
 const connectionString = process.env.ACS_CONNECTION_STRING;
 const roomsClient = new RoomsClient(connectionString);
+const identityClient = new CommunicationIdentityClient(connectionString);
+
+// Extract ACS endpoint from connection string
+const ACS_ENDPOINT = connectionString.match(/endpoint=(https:\/\/[^;]+)/)?.[1] || 
+                     process.env.ACS_ENDPOINT;
 
 /**
  * Create a new ACS Room for a trial
@@ -58,6 +65,90 @@ async function addParticipantToRoom(roomId, participantId, role = "Attendee") {
     throw error;
   }
 }
+
+/**
+ * Create a chat thread for the trial
+ * Uses a service identity so it's not tied to any specific user
+ * RETURNS BOTH chatThreadId AND serviceUserId (IMPORTANT!)
+ */
+async function createChatThread(topic) {
+  try {
+    console.log("Creating service identity for chat thread...");
+    
+    // Create a service identity to own the chat thread
+    const serviceIdentity = await identityClient.createUser();
+    const serviceToken = await identityClient.getToken(serviceIdentity, ["chat"]);
+    
+    console.log("Service identity created:", serviceIdentity.communicationUserId);
+    
+    // Create chat client with service identity
+    const credential = new AzureCommunicationTokenCredential(serviceToken.token);
+    const chatClient = new ChatClient(ACS_ENDPOINT, credential);
+    
+    // Create the chat thread
+    const createChatThreadResult = await chatClient.createChatThread({
+      topic: topic
+    });
+    
+    const chatThreadId = createChatThreadResult.chatThread.id;
+    console.log("Chat thread created successfully:", chatThreadId);
+    
+    return {
+      chatThreadId: chatThreadId,
+      serviceUserId: serviceIdentity.communicationUserId  // IMPORTANT: Return this!
+    };
+  } catch (error) {
+    console.error("Error creating chat thread:", error);
+    throw error;
+  }
+}
+
+/**
+ * Add participant to chat thread
+ * Uses the ORIGINAL service identity that created the thread (not a new one!)
+ * 
+ * @param {string} chatThreadId - The chat thread ID
+ * @param {string} chatServiceUserId - The service user ID that created the thread
+ * @param {string} participantUserId - The user ID to add
+ * @param {string} displayName - Display name for the participant
+ */
+async function addParticipantToChat(chatThreadId, chatServiceUserId, participantUserId, displayName) {
+  try {
+    console.log(`Adding ${displayName} to chat thread ${chatThreadId}`);
+    console.log(`Using service user ID: ${chatServiceUserId}`);
+    
+    // Get a fresh token for the ORIGINAL service identity
+    const serviceToken = await identityClient.getToken(
+      { communicationUserId: chatServiceUserId },
+      ["chat"]
+    );
+    
+    const credential = new AzureCommunicationTokenCredential(serviceToken.token);
+    const chatClient = new ChatClient(ACS_ENDPOINT, credential);
+    const chatThreadClient = chatClient.getChatThreadClient(chatThreadId);
+    
+    // Add the participant
+    await chatThreadClient.addParticipants({
+      participants: [
+        {
+          id: { communicationUserId: participantUserId },
+          displayName: displayName
+        }
+      ]
+    });
+    
+    console.log(`✅ Added ${displayName} to chat thread ${chatThreadId}`);
+  } catch (error) {
+    // Ignore if participant already exists
+    if (error.statusCode === 409 || error.message?.includes("already exists")) {
+      console.log(`Participant ${displayName} already in chat - skipping`);
+      return;
+    }
+    console.error("Error adding participant to chat:", error);
+    throw error;
+  }
+}
+
 /**
  * Get room details
  */
@@ -87,6 +178,9 @@ async function deleteRoom(roomId) {
 module.exports = {
   createRoom,
   addParticipantToRoom,
+  createChatThread,
+  addParticipantToChat,
   getRoom,
   deleteRoom,
+  ACS_ENDPOINT
 };

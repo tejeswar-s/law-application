@@ -28,7 +28,7 @@ export default function JurorConferenceClient() {
   const [featuredParticipant, setFeaturedParticipant] = useState<string>("local");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [displayName, setDisplayName] = useState("You");
   const [renderTrigger, setRenderTrigger] = useState(0);
@@ -97,7 +97,7 @@ export default function JurorConferenceClient() {
         featuredVideoRef.current.appendChild(view.target);
       }
       
-      if (localThumbnailRef.current) {
+      else if (localThumbnailRef.current) {
         if (localThumbnailRenderer.current) localThumbnailRenderer.current.dispose();
         localThumbnailRenderer.current = new VideoStreamRenderer(localVideoStream.current);
         const thumbnailView = await localThumbnailRenderer.current.createView();
@@ -175,12 +175,10 @@ export default function JurorConferenceClient() {
         await initializeChat(data.token, data.userId, data.chatThreadId, data.endpointUrl);
       }
 
-      setCallState("Initializing devices...");
-
-      const callClient = new CallClient();
+      setCallState("Setting up video...");
       const tokenCredential = new AzureCommunicationTokenCredential(data.token);
+      const callClient = new CallClient();
       const deviceManager = await callClient.getDeviceManager();
-      await deviceManager.askDevicePermission({ video: true, audio: true });
 
       const cameras = await deviceManager.getCameras();
       if (cameras.length > 0) {
@@ -190,126 +188,56 @@ export default function JurorConferenceClient() {
       setCallState("Connecting to trial...");
 
       const agent = await callClient.createCallAgent(tokenCredential, {
-        displayName: data.displayName
+        displayName: data.displayName,
       });
 
       const roomCall = agent.join(
         { roomId: data.roomId },
-        { 
-          videoOptions: localVideoStream.current ? { 
-            localVideoStreams: [localVideoStream.current] 
-          } : undefined
+        {
+          videoOptions: localVideoStream.current
+            ? { localVideoStreams: [localVideoStream.current] }
+            : undefined,
         }
       );
 
-      await roomCall.mute();
       setCall(roomCall);
-
       setParticipantJoinTimes(prev => new Map(prev).set("local", new Date()));
 
-      roomCall.on('stateChanged', async () => {
+      roomCall.on("stateChanged", async () => {
+        console.log(`🔄 Call state changed: ${roomCall.state}`);
         setCallState(roomCall.state);
-        if (roomCall.state === 'Connected') {
+        if (roomCall.state === "Connected") {
           await renderLocalVideo();
           setIsMuted(roomCall.isMuted);
+          
+          // ✅ CRITICAL FIX #1: Re-subscribe to existing participants' streams after connection
+          console.log("🔍 Checking for existing remote participants...");
+          roomCall.remoteParticipants.forEach((participant: any) => {
+            console.log(`📌 Found existing participant: ${participant.displayName}`);
+            subscribeToParticipantStreams(participant, roomCall);
+          });
         }
       });
 
-      roomCall.on('isMutedChanged', () => {
-        setIsMuted(roomCall.isMuted);
-      });
-
+      // ✅ ENHANCED: Better remote participant handling
       roomCall.on('remoteParticipantsUpdated', async (e: any) => {
+        console.log("👥 Remote participants updated", {
+          added: e.added.length,
+          removed: e.removed.length
+        });
+
         for (const participant of e.added) {
           const userId = participant.identifier.communicationUserId;
+          console.log(`➕ Participant added: ${participant.displayName} (${userId})`);
+          
           setParticipantJoinTimes(prev => new Map(prev).set(userId, new Date()));
-
-          participant.on('videoStreamsUpdated', async (ev: any) => {
-            for (const stream of ev.removed) {
-              const streamKey = stream.mediaStreamType === 'ScreenSharing' 
-                ? `${userId}-screen`
-                : userId;
-              
-              const ref = remoteVideoRefs.current.get(streamKey);
-              if (ref && ref.renderer) {
-                ref.renderer.dispose();
-              }
-              
-              remoteVideoRefs.current.set(streamKey, {
-                renderer: null,
-                view: null,
-                participant,
-                streamType: stream.mediaStreamType,
-                videoOff: true
-              });
-              
-              setRenderTrigger(prev => prev + 1);
-            }
-
-            for (const stream of ev.added) {
-              if (stream.isAvailable) {
-                try {
-                  const renderer = new VideoStreamRenderer(stream);
-                  const view = await renderer.createView();
-
-                  const streamKey = stream.mediaStreamType === 'ScreenSharing' 
-                    ? `${userId}-screen`
-                    : userId;
-                  
-                  remoteVideoRefs.current.set(streamKey, {
-                    renderer,
-                    view,
-                    participant,
-                    streamType: stream.mediaStreamType,
-                    videoOff: false
-                  });
-                  
-                  setRenderTrigger(prev => prev + 1);
-                  
-                  if (stream.mediaStreamType === 'ScreenSharing') {
-                    setFeaturedParticipant(streamKey);
-                  }
-                } catch (err) {
-                  console.error("Remote video error:", err);
-                }
-              }
-            }
-            
-            setParticipants([...roomCall.remoteParticipants]);
-          });
-
-          for (const stream of participant.videoStreams) {
-            if (stream.isAvailable) {
-              try {
-                const renderer = new VideoStreamRenderer(stream);
-                const view = await renderer.createView();
-                
-                const streamKey = stream.mediaStreamType === 'ScreenSharing' 
-                  ? `${userId}-screen`
-                  : userId;
-                
-                remoteVideoRefs.current.set(streamKey, {
-                  renderer,
-                  view,
-                  participant,
-                  streamType: stream.mediaStreamType,
-                  videoOff: false
-                });
-                
-                setRenderTrigger(prev => prev + 1);
-                
-                if (stream.mediaStreamType === 'ScreenSharing') {
-                  setFeaturedParticipant(streamKey);
-                }
-              } catch (err) {
-                console.error("Remote video error:", err);
-              }
-            }
-          }
+          subscribeToParticipantStreams(participant, roomCall);
         }
 
         for (const participant of e.removed) {
           const userId = participant.identifier.communicationUserId;
+          console.log(`➖ Participant removed: ${participant.displayName}`);
+          
           const ref = remoteVideoRefs.current.get(userId);
           const screenRef = remoteVideoRefs.current.get(`${userId}-screen`);
           
@@ -336,10 +264,146 @@ export default function JurorConferenceClient() {
         setParticipants([...roomCall.remoteParticipants]);
       });
 
+      // 🔧 FIX #2: Ensure mic state updates are tracked
+      roomCall.on("isMutedChanged", () => {
+        console.log("🎤 Mute state changed:", roomCall.isMuted);
+        setIsMuted(roomCall.isMuted);
+      });
+
       setLoading(false);
     } catch (err: any) {
       setError(err.message || "Failed to join trial");
       setLoading(false);
+    }
+  }
+
+  // ✅ FIX #1: Centralized stream subscription with better logging
+  function subscribeToParticipantStreams(participant: any, roomCall: any) {
+    const userId = participant.identifier.communicationUserId;
+    
+    console.log(`🎥 Subscribing to streams for: ${participant.displayName}`);
+    console.log(`   Current video streams:`, participant.videoStreams.map((s: any) => ({
+      type: s.mediaStreamType,
+      available: s.isAvailable
+    })));
+
+    // Subscribe to future stream updates
+    participant.on('videoStreamsUpdated', async (ev: any) => {
+      console.log(`🔄 Video streams updated for ${participant.displayName}:`, {
+        added: ev.added.map((s: any) => s.mediaStreamType),
+        removed: ev.removed.map((s: any) => s.mediaStreamType)
+      });
+
+      // Handle removed streams
+      for (const stream of ev.removed) {
+        const streamKey = stream.mediaStreamType === 'ScreenSharing' 
+          ? `${userId}-screen`
+          : userId;
+        
+        console.log(`❌ Removing stream: ${streamKey}`);
+        
+        const ref = remoteVideoRefs.current.get(streamKey);
+        if (ref && ref.renderer) {
+          ref.renderer.dispose();
+        }
+        
+        // 🔧 FIX #2: Mark as video off for blank black screen
+        remoteVideoRefs.current.set(streamKey, {
+          renderer: null,
+          view: null,
+          participant,
+          streamType: stream.mediaStreamType,
+          videoOff: true
+        });
+        
+        // 🔧 FIX #3: When screenshare stops, auto-switch back to attorney video
+        if (stream.mediaStreamType === 'ScreenSharing' && featuredParticipant === streamKey) {
+          // Clear featured video FIRST to avoid stuck frame
+          if (featuredVideoRef.current) {
+            featuredVideoRef.current.innerHTML = "";
+          }
+          setFeaturedParticipant("local");
+          console.log("✅ Screen share stopped - switched back to local video");
+        }
+        
+        setRenderTrigger(prev => prev + 1);
+      }
+
+      // Handle added streams
+      for (const stream of ev.added) {
+        console.log(`➕ Stream added: ${stream.mediaStreamType}, available: ${stream.isAvailable}`);
+        
+        if (stream.isAvailable) {
+          await renderRemoteStream(stream, participant, userId);
+        } else {
+          // Subscribe to isAvailable changes
+          console.log(`⏳ Stream not yet available, subscribing to availability changes...`);
+          stream.on('isAvailableChanged', async () => {
+            console.log(`🔔 Stream availability changed: ${stream.mediaStreamType} -> ${stream.isAvailable}`);
+            if (stream.isAvailable) {
+              await renderRemoteStream(stream, participant, userId);
+            }
+          });
+        }
+      }
+    });
+
+    // Process existing streams (important for screen shares that started before joining)
+    for (const stream of participant.videoStreams) {
+      console.log(`📺 Processing existing stream: ${stream.mediaStreamType}, available: ${stream.isAvailable}`);
+      
+      if (stream.isAvailable) {
+        renderRemoteStream(stream, participant, userId);
+      } else {
+        // Subscribe to availability changes for existing streams too
+        stream.on('isAvailableChanged', async () => {
+          console.log(`🔔 Existing stream availability changed: ${stream.mediaStreamType} -> ${stream.isAvailable}`);
+          if (stream.isAvailable) {
+            await renderRemoteStream(stream, participant, userId);
+          }
+        });
+      }
+    }
+  }
+
+  // ✅ FIX #1: Dedicated remote stream renderer with better error handling
+  async function renderRemoteStream(stream: any, participant: any, userId: string) {
+    try {
+      const streamKey = stream.mediaStreamType === 'ScreenSharing' 
+        ? `${userId}-screen`
+        : userId;
+      
+      console.log(`🎬 Rendering stream: ${streamKey}`);
+      
+      // Clean up old renderer if exists
+      const existingRef = remoteVideoRefs.current.get(streamKey);
+      if (existingRef && existingRef.renderer) {
+        console.log(`♻️ Disposing old renderer for ${streamKey}`);
+        existingRef.renderer.dispose();
+      }
+
+      const renderer = new VideoStreamRenderer(stream);
+      const view = await renderer.createView();
+      
+      remoteVideoRefs.current.set(streamKey, {
+        renderer,
+        view,
+        participant,
+        streamType: stream.mediaStreamType,
+        videoOff: false
+      });
+      
+      console.log(`✅ Stream rendered successfully: ${streamKey}`);
+      
+      // ✅ Auto-switch to screen share if it's a screen sharing stream
+      if (stream.mediaStreamType === 'ScreenSharing') {
+        console.log(`📺 Auto-switching to screen share from ${participant.displayName}`);
+        setFeaturedParticipant(streamKey);
+      }
+      
+      setRenderTrigger(prev => prev + 1);
+    } catch (err) {
+      console.error(`❌ Error rendering remote stream:`, err);
     }
   }
 
@@ -380,13 +444,16 @@ export default function JurorConferenceClient() {
     }
   };
 
+  // 🔧 FIX #2: Ensure mic toggle actually works
   const toggleMute = async () => {
     if (!call) return;
     try {
       if (call.isMuted) {
         await call.unmute();
+        console.log("🎤 Unmuted");
       } else {
         await call.mute();
+        console.log("🔇 Muted");
       }
     } catch (err) {
       console.error("Toggle mute error:", err);
@@ -415,21 +482,23 @@ export default function JurorConferenceClient() {
     router.push("/juror");
   };
 
-  const formatTime = (date: Date) => {
+  function formatTime(date: Date): string {
+    if (!date) return "Unknown";
     const now = new Date();
-    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-    
-    if (diff < 60) return "Just now";
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return "Just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ago`;
+  }
 
   if (loading) {
     return (
-      <div className="h-screen bg-[#E8E5DD] flex items-center justify-center">
+      <div className="h-screen flex items-center justify-center bg-[#E8E5DD]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#16305B] mx-auto mb-4"></div>
-          <p className="text-[#16305B] text-lg font-medium">{callState}</p>
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#0078D4] mb-4"></div>
+          <p className="text-lg font-medium text-gray-700">{callState}</p>
         </div>
       </div>
     );
@@ -437,24 +506,26 @@ export default function JurorConferenceClient() {
 
   if (error) {
     return (
-      <div className="h-screen bg-[#E8E5DD] flex items-center justify-center">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md">
-          <h2 className="text-xl font-bold text-red-600 mb-4">Failed to Join Trial</h2>
-          <p className="text-gray-700 mb-4">{error}</p>
+      <div className="h-screen flex items-center justify-center bg-[#E8E5DD]">
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md text-center">
+          <div className="text-red-500 text-5xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Unable to Join Trial</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
           <button
             onClick={() => router.push("/juror")}
-            className="w-full py-2 bg-[#16305B] text-white rounded hover:bg-[#0A2342]"
+            className="w-full px-6 py-3 bg-[#0078D4] text-white rounded-lg hover:bg-[#005A9E] transition font-medium"
           >
-            Back to Dashboard
+            Return to Dashboard
           </button>
         </div>
       </div>
     );
   }
 
-  const featuredVideo = featuredParticipant && featuredParticipant !== "local"
-    ? remoteVideoRefs.current.get(featuredParticipant)
-    : null;
+  const featuredVideo =
+    featuredParticipant && featuredParticipant !== "local"
+      ? remoteVideoRefs.current.get(featuredParticipant)
+      : null;
 
   const allParticipants = [
     { 
@@ -478,7 +549,7 @@ export default function JurorConferenceClient() {
         <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center mb-8">
           <span className="text-[#1B3A5F] font-bold text-xl">Q</span>
         </div>
-        
+
         <button className="mb-4 flex flex-col items-center gap-1 text-white hover:bg-[#2A4A6F] w-full py-3">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -515,17 +586,15 @@ export default function JurorConferenceClient() {
                       className="w-full h-full [&>div]:!w-full [&>div]:!h-full [&_video]:object-contain"
                     />
                   ) : (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
-                      <div className="w-32 h-32 bg-gray-400 rounded-full flex items-center justify-center">
-                        <span className="text-white text-4xl font-bold">
-                          {featuredVideo.participant.displayName?.charAt(0)?.toUpperCase() || "P"}
-                        </span>
-                      </div>
-                    </div>
+                    // 🔧 FIX #2: Complete black screen when camera is off
+                    <div className="absolute inset-0 bg-black"></div>
                   )}
-                  {featuredVideo.streamType === 'ScreenSharing' && (
-                    <div className="absolute top-2 left-2 bg-[#0078D4] text-white px-2 py-1 rounded text-xs font-medium">
-                      {featuredVideo.participant.displayName}'s screen
+                  {featuredVideo.streamType === 'ScreenSharing' && !featuredVideo.videoOff && (
+                    <div className="absolute top-2 left-2 bg-[#0078D4] text-white px-3 py-1.5 rounded text-sm font-semibold shadow-lg flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                      {featuredVideo.participant.displayName}
                     </div>
                   )}
                 </>
@@ -534,20 +603,13 @@ export default function JurorConferenceClient() {
                   {featuredParticipant === "local" ? (
                     <>
                       <div
-                        ref={featuredVideoRef}
-                        className="flex items-center justify-center w-full h-full bg-black"
-                      >
-                        <div className="w-[40%] max-w-[480px] aspect-video rounded-xl overflow-hidden shadow-lg border-2 border-gray-700">
-                          <div className="[&_video]:object-cover [&_video]:rounded-xl w-full h-full" />
-                        </div>
-                      </div>
+  ref={featuredVideoRef}
+  className="flex items-center justify-center w-full h-full bg-black"
+/>
 
+                      {/* 🔧 FIX #2: Complete black screen when juror camera is off */}
                       {isVideoOff && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
-                          <div className="w-24 h-24 bg-gray-500 rounded-full flex items-center justify-center shadow-md">
-                            <span className="text-white text-2xl font-bold">You</span>
-                          </div>
-                        </div>
+                        <div className="absolute inset-0 bg-black"></div>
                       )}
                     </>
                   ) : null}
@@ -566,13 +628,12 @@ export default function JurorConferenceClient() {
             }`}
           >
             <div className="w-28 h-20 bg-black rounded-lg overflow-hidden mb-2 relative">
-              <div ref={localThumbnailRef} className="w-full h-full [&_video]:object-cover" />
+              {!isVideoOff && featuredParticipant !== "local" && (
+  <div ref={localThumbnailRef} className="w-full h-full [&_video]:object-cover" />
+)}
+              {/* 🔧 FIX #2: Complete black thumbnail when camera is off */}
               {isVideoOff && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-700">
-                  <div className="w-10 h-10 bg-gray-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm font-bold">You</span>
-                  </div>
-                </div>
+                <div className="absolute inset-0 bg-black"></div>
               )}
             </div>
             <div className="text-sm font-medium text-gray-800">{displayName}</div>
@@ -607,16 +668,11 @@ export default function JurorConferenceClient() {
                         className="w-full h-full [&_video]:object-cover"
                       />
                     ) : (
-                      <div className="absolute inset-0 flex items-center justify-center bg-gray-700">
-                        <div className="w-10 h-10 bg-gray-500 rounded-full flex items-center justify-center">
-                          <span className="text-white text-sm font-bold">
-                            {p.displayName?.charAt(0)?.toUpperCase() || "P"}
-                          </span>
-                        </div>
-                      </div>
+                      // 🔧 FIX #2: Complete black screen for remote participants when camera off
+                      <div className="absolute inset-0 bg-black"></div>
                     )}
                   </div>
-                  <div className="text-sm font-medium text-gray-800">{p.displayName || "Participant"}</div>
+                  <div className="text-sm font-medium text-gray-800">{p.displayName}</div>
                 </button>
               );
             })}
@@ -782,7 +838,8 @@ export default function JurorConferenceClient() {
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
                 placeholder="Type a message..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-500"
+                style={{ color: '#000000' }}
                 disabled={!chatThread}
               />
               <button

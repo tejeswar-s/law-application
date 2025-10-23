@@ -35,6 +35,8 @@ export default function TrialConferenceClient() {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const screenShareStream = useRef<any>(null);
+  const screenShareRenderer = useRef<any>(null);
   const [displayName, setDisplayName] = useState("You");
   const [renderTrigger, setRenderTrigger] = useState(0);
 
@@ -75,32 +77,59 @@ export default function TrialConferenceClient() {
       }
       if (localRenderer.current) localRenderer.current.dispose();
       if (localThumbnailRenderer.current) localThumbnailRenderer.current.dispose();
+      if (screenShareRenderer.current) screenShareRenderer.current.dispose(); 
       remoteVideoRefs.current.forEach((r) => r.renderer?.dispose());
     };
   }, []);
 
   async function renderLocalVideo() {
-    if (!localVideoStream.current) return;
+  if (!localVideoStream.current) return;
+
+  try {
+    // ✅ ONLY render to ONE place at a time based on where you are
+    if (featuredParticipant === "local" && featuredVideoRef.current) {
+      // You're in main view - render to featured card only
+      if (localRenderer.current) localRenderer.current.dispose();
+      localRenderer.current = new VideoStreamRenderer(localVideoStream.current);
+      const view = await localRenderer.current.createView();
+      featuredVideoRef.current.innerHTML = "";
+      featuredVideoRef.current.appendChild(view.target);
+    } else if (localThumbnailRef.current) {  // ✅ Changed: if → else if
+      // You're NOT in main view - render to thumbnail only
+      if (localThumbnailRenderer.current)
+        localThumbnailRenderer.current.dispose();
+      localThumbnailRenderer.current = new VideoStreamRenderer(localVideoStream.current);
+      const thumbnailView = await localThumbnailRenderer.current.createView();
+      localThumbnailRef.current.innerHTML = "";
+      localThumbnailRef.current.appendChild(thumbnailView.target);
+    }
+  } catch (err) {
+    console.error("Local video render error:", err);
+  }
+}
+
+  async function renderScreenShare() {
+    if (!screenShareStream.current || !featuredVideoRef.current) return;
 
     try {
-      if (featuredParticipant === "local" && featuredVideoRef.current) {
-        if (localRenderer.current) localRenderer.current.dispose();
-        localRenderer.current = new VideoStreamRenderer(localVideoStream.current);
-        const view = await localRenderer.current.createView();
-        featuredVideoRef.current.innerHTML = "";
-        featuredVideoRef.current.appendChild(view.target);
+      console.log("Rendering screen share...");
+      
+      // Dispose old renderer
+      if (screenShareRenderer.current) {
+        screenShareRenderer.current.dispose();
       }
-
-      if (localThumbnailRef.current) {
-        if (localThumbnailRenderer.current)
-          localThumbnailRenderer.current.dispose();
-        localThumbnailRenderer.current = new VideoStreamRenderer(localVideoStream.current);
-        const thumbnailView = await localThumbnailRenderer.current.createView();
-        localThumbnailRef.current.innerHTML = "";
-        localThumbnailRef.current.appendChild(thumbnailView.target);
-      }
+      
+      // Create new renderer for screen share
+      screenShareRenderer.current = new VideoStreamRenderer(screenShareStream.current);
+      const view = await screenShareRenderer.current.createView();
+      
+      // Clear and append to featured video
+      featuredVideoRef.current.innerHTML = "";
+      featuredVideoRef.current.appendChild(view.target);
+      
+      console.log("✅ Screen share rendered");
     } catch (err) {
-      console.error("Local video render error:", err);
+      console.error("Screen share render error:", err);
     }
   }
 
@@ -115,50 +144,73 @@ export default function TrialConferenceClient() {
   }, [messages]);
 
   async function initializeChat(token: string, userId: string, threadId: string, endpoint: string) {
-  try {
-    console.log("Initializing chat with endpoint:", endpoint);
-    
-    const tokenCredential = new AzureCommunicationTokenCredential(token);
-    const client = new ChatClient(endpoint, tokenCredential);
-    
-    setChatClient(client);
-    const thread = client.getChatThreadClient(threadId);
-    setChatThread(thread);
-    currentUserId.current = userId;
+    try {
+      console.log("Initializing chat with endpoint:", endpoint);
+      
+      const tokenCredential = new AzureCommunicationTokenCredential(token);
+      const client = new ChatClient(endpoint, tokenCredential);
+      
+      setChatClient(client);
+      const thread = client.getChatThreadClient(threadId);
+      setChatThread(thread);
+      currentUserId.current = userId;
 
-    // Listen for new messages
-    await client.startRealtimeNotifications();
-    
-    client.on("chatMessageReceived", (e: any) => {
-      if (e.sender.communicationUserId !== currentUserId.current) {
-        const newMsg = {
-          id: e.id,
-          content: e.message,
-          sender: e.senderDisplayName || "Unknown",
-          senderId: e.sender.communicationUserId,
-          timestamp: new Date(e.createdOn),
-        };
-        
-        setMessages(prev => [...prev, newMsg]);
-        
-        if (!showChatPanel) {
-          setUnreadCount(prev => prev + 1);
-          setLatestMessage(newMsg);
-          setShowChatNotification(true);
-          setTimeout(() => setShowChatNotification(false), 5000);
+      // Listen for new messages
+      await client.startRealtimeNotifications();
+      
+      client.on("chatMessageReceived", (e: any) => {
+        if (e.sender.communicationUserId !== currentUserId.current) {
+          const newMsg = {
+            id: e.id,
+            content: e.message,
+            sender: e.senderDisplayName || "Unknown",
+            senderId: e.sender.communicationUserId,
+            timestamp: new Date(e.createdOn),
+          };
+          
+          setMessages(prev => [...prev, newMsg]);
+          
+          if (!showChatPanel) {
+            setUnreadCount(prev => prev + 1);
+            setLatestMessage(newMsg);
+            setShowChatNotification(true);
+            setTimeout(() => setShowChatNotification(false), 5000);
+          }
         }
-      }
-    });
+      });
 
-    console.log("Chat initialized successfully!");
-    
-    // DON'T try to load existing messages - causes 403 error
-    // Users will automatically be added as participants when they send first message
-    
-  } catch (err) {
-    console.error("Chat initialization error:", err);
+      console.log("Chat initialized successfully!");
+      
+      // Load message history
+      try {
+        const messagesIterator = thread.listMessages({ maxPageSize: 50 });
+        const loadedMessages: any[] = [];
+        
+        for await (const message of messagesIterator) {
+          if (message.type === "text") {
+            loadedMessages.push({
+              id: message.id,
+              content: message.content?.message || "",
+              sender: message.senderDisplayName || "Unknown",
+              senderId: message.sender?.communicationUserId || "",
+              timestamp: new Date(message.createdOn),
+            });
+          }
+        }
+        
+        // Sort by timestamp (oldest first)
+        loadedMessages.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+        setMessages(loadedMessages);
+        console.log(`✅ Loaded ${loadedMessages.length} chat messages`);
+        
+      } catch (historyErr) {
+        console.log("No message history yet (this is normal for new chats)");
+      }
+      
+    } catch (err) {
+      console.error("Chat initialization error:", err);
+    }
   }
-}
 
   async function initializeCall() {
     try {
@@ -177,11 +229,10 @@ export default function TrialConferenceClient() {
       const data = await response.json();
       setDisplayName(data.displayName);
 
-      // Initialize chat (you'll need to get threadId from backend)
-      // Initialize chat (you'll need to get threadId from backend)
-if (data.chatThreadId && data.endpointUrl) {
-  await initializeChat(data.token, data.userId, data.chatThreadId, data.endpointUrl);
-}
+      // Initialize chat
+      if (data.chatThreadId && data.endpointUrl) {
+        await initializeChat(data.token, data.userId, data.chatThreadId, data.endpointUrl);
+      }
 
       setCallState("Initializing devices...");
 
@@ -223,134 +274,231 @@ if (data.chatThreadId && data.endpointUrl) {
         }
       });
 
-      roomCall.on("isMutedChanged", () => {
-        setIsMuted(roomCall.isMuted);
+      // 🔧 FIX #3: Listen for screen share stop and auto-switch back to attorney video
+      roomCall.on("localVideoStreamsUpdated", (e: any) => {
+        console.log("Local video streams updated:", e);
+        
+        e.added.forEach(async (stream: any) => {
+          console.log("Stream added:", stream.mediaStreamType);
+          
+          if (stream.mediaStreamType === "ScreenSharing") {
+            // Screen share started
+            screenShareStream.current = stream;
+            setFeaturedParticipant("screenshare");
+            setRenderTrigger(prev => prev + 1);
+            console.log("✅ Screen share stream detected");
+          }
+        });
+        
+        e.removed.forEach((stream: any) => {
+          console.log("Stream removed:", stream.mediaStreamType);
+          
+          if (stream.mediaStreamType === "ScreenSharing") {
+            // 🔧 FIX #3: Screen share stopped - IMMEDIATELY clear and switch back
+            console.log("🔥 Screen share stopped - cleaning up...");
+            
+            // Clear the featured video ref FIRST to remove stuck frame
+            if (featuredVideoRef.current) {
+              featuredVideoRef.current.innerHTML = "";
+              console.log("✅ Cleared featured video element");
+            }
+            
+            // Dispose screen share renderer
+            if (screenShareRenderer.current) {
+              screenShareRenderer.current.dispose();
+              screenShareRenderer.current = null;
+            }
+            screenShareStream.current = null;
+            setIsScreenSharing(false);
+            
+            // Switch back to attorney video
+            setFeaturedParticipant("local");
+            
+            // Force re-render of local video
+            setTimeout(() => {
+              setRenderTrigger(prev => prev + 1);
+              console.log("✅ Switched back to attorney video");
+            }, 50);
+          }
+        });
       });
 
-      roomCall.on("remoteParticipantsUpdated", async (e: any) => {
-        for (const participant of e.added) {
+      // 🔧 FIX #1: Enhanced remote participant video stream handling
+      roomCall.on("remoteParticipantsUpdated", (e: any) => {
+        e.added.forEach((participant: any) => {
+          console.log("Remote participant added:", participant.displayName);
+          
+          // Track join time
           const userId = participant.identifier.communicationUserId;
           setParticipantJoinTimes(prev => new Map(prev).set(userId, new Date()));
-
-          participant.on("videoStreamsUpdated", async (ev: any) => {
-            for (const stream of ev.removed) {
-              const streamKey = stream.mediaStreamType === 'ScreenSharing' 
-                ? `${userId}-screen`
-                : userId;
+          
+          // Subscribe to their video streams with enhanced logging
+          participant.on("videoStreamsUpdated", (streamEvent: any) => {
+            console.log(`📹 Video streams updated for ${participant.displayName}`);
+            
+            streamEvent.added.forEach(async (stream: any) => {
+              console.log(`➕ Stream added - Type: ${stream.mediaStreamType}, Available: ${stream.isAvailable}`);
               
-              const ref = remoteVideoRefs.current.get(streamKey);
-              if (ref && ref.renderer) {
-                ref.renderer.dispose();
-              }
-              
-              remoteVideoRefs.current.set(streamKey, {
-                renderer: null,
-                view: null,
-                participant,
-                streamType: stream.mediaStreamType,
-                videoOff: true
-              });
-              
-              setRenderTrigger(prev => prev + 1);
-            }
-
-            for (const stream of ev.added) {
-              if (stream.isAvailable) {
+              if (stream.mediaStreamType === "Video") {
+                // Regular camera stream
+                if (stream.isAvailable) {
+                  await renderRemoteVideo(stream, participant, userId);
+                } else {
+                  // Wait for stream to become available
+                  console.log(`⏳ Waiting for video stream to become available...`);
+                  stream.on("isAvailableChanged", async () => {
+                    console.log(`🔔 Video stream availability changed: ${stream.isAvailable}`);
+                    if (stream.isAvailable) {
+                      await renderRemoteVideo(stream, participant, userId);
+                    }
+                  });
+                }
+              } else if (stream.mediaStreamType === "ScreenSharing") {
+                // Remote participant started screen sharing
+                console.log(`${participant.displayName} is sharing screen`);
+                
+                // Render their screen share
                 try {
                   const renderer = new VideoStreamRenderer(stream);
                   const view = await renderer.createView();
-
-                  const streamKey = stream.mediaStreamType === 'ScreenSharing' 
-                    ? `${userId}-screen`
-                    : userId;
-
-                  remoteVideoRefs.current.set(streamKey, {
-                    renderer,
-                    view,
-                    participant,
-                    streamType: stream.mediaStreamType,
-                    videoOff: false
-                  });
-
-                  setRenderTrigger(prev => prev + 1);
-
-                  // Auto-switch to screen share
-                  if (stream.mediaStreamType === 'ScreenSharing') {
-                    setFeaturedParticipant(streamKey);
+                  
+                  if (featuredVideoRef.current) {
+                    featuredVideoRef.current.innerHTML = "";
+                    featuredVideoRef.current.appendChild(view.target);
+                    setFeaturedParticipant(`remote-${participant.identifier}`);
                   }
+                  
+                  // Store renderer for cleanup
+                  remoteVideoRefs.current.set(`screenshare-${participant.identifier}`, {
+                    stream,
+                    renderer,
+                    view
+                  });
                 } catch (err) {
-                  console.error("Remote video error:", err);
+                  console.error("Error rendering remote screen share:", err);
                 }
               }
-            }
+            });
             
-            setParticipants([...roomCall.remoteParticipants]);
-          });
-
-          for (const stream of participant.videoStreams) {
-            if (stream.isAvailable) {
-              try {
-                const renderer = new VideoStreamRenderer(stream);
-                const view = await renderer.createView();
-                
-                const streamKey = stream.mediaStreamType === 'ScreenSharing' 
-                  ? `${userId}-screen`
-                  : userId;
-                
-                remoteVideoRefs.current.set(streamKey, {
-                  renderer,
-                  view,
-                  participant,
-                  streamType: stream.mediaStreamType,
-                  videoOff: false
+            streamEvent.removed.forEach((stream: any) => {
+              console.log(`➖ Stream removed - Type: ${stream.mediaStreamType}`);
+              
+              if (stream.mediaStreamType === "Video") {
+                // 🔧 FIX #2: Mark video as off instead of disposing
+                remoteVideoRefs.current.set(userId, {
+                  ...remoteVideoRefs.current.get(userId),
+                  videoOff: true
                 });
-                
                 setRenderTrigger(prev => prev + 1);
-                
-                // Auto-switch to screen share
-                if (stream.mediaStreamType === 'ScreenSharing') {
-                  setFeaturedParticipant(streamKey);
+              } else if (stream.mediaStreamType === "ScreenSharing") {
+                // 🔧 FIX #3: Remote participant stopped screen sharing - auto-switch back
+                const key = `screenshare-${participant.identifier}`;
+                const ref = remoteVideoRefs.current.get(key);
+                if (ref) {
+                  ref.renderer?.dispose();
+                  remoteVideoRefs.current.delete(key);
                 }
-              } catch (err) {
-                console.error("Remote video error:", err);
+                
+                // Clear and switch back to attorney video
+                if (featuredVideoRef.current) {
+                  featuredVideoRef.current.innerHTML = "";
+                }
+                setFeaturedParticipant("local");
+                setRenderTrigger(prev => prev + 1);
+                console.log("✅ Remote screen share removed - switched back to attorney video");
+              }
+            });
+          });
+          
+          // 🔧 FIX #1: Process existing streams immediately
+          console.log(`📺 Processing ${participant.videoStreams.length} existing streams for ${participant.displayName}`);
+          participant.videoStreams.forEach(async (stream: any) => {
+            console.log(`📺 Existing stream - Type: ${stream.mediaStreamType}, Available: ${stream.isAvailable}`);
+            
+            if (stream.mediaStreamType === "Video") {
+              if (stream.isAvailable) {
+                await renderRemoteVideo(stream, participant, userId);
+              } else {
+                stream.on("isAvailableChanged", async () => {
+                  console.log(`🔔 Existing video stream availability changed: ${stream.isAvailable}`);
+                  if (stream.isAvailable) {
+                    await renderRemoteVideo(stream, participant, userId);
+                  }
+                });
               }
             }
-          }
-        }
-
-        for (const participant of e.removed) {
-          const userId = participant.identifier.communicationUserId;
-          const ref = remoteVideoRefs.current.get(userId);
-          const screenRef = remoteVideoRefs.current.get(`${userId}-screen`);
+          });
+        });
+        
+        e.removed.forEach((participant: any) => {
+          console.log("Remote participant removed:", participant.displayName);
           
+          const userId = participant.identifier.communicationUserId;
+          
+          // Cleanup their video
+          const ref = remoteVideoRefs.current.get(userId);
           if (ref && ref.renderer) {
             ref.renderer.dispose();
             remoteVideoRefs.current.delete(userId);
           }
-          if (screenRef && screenRef.renderer) {
-            screenRef.renderer.dispose();
-            remoteVideoRefs.current.delete(`${userId}-screen`);
+          
+          // Cleanup their screen share if any
+          const screenKey = `screenshare-${participant.identifier}`;
+          const screenRef = remoteVideoRefs.current.get(screenKey);
+          if (screenRef) {
+            screenRef.renderer?.dispose();
+            remoteVideoRefs.current.delete(screenKey);
           }
           
-          // If featured participant left, switch back to local
-          if (featuredParticipant === userId || featuredParticipant === `${userId}-screen`) {
-            setFeaturedParticipant("local");
-          }
-
+          // Remove join time
           setParticipantJoinTimes(prev => {
             const updated = new Map(prev);
             updated.delete(userId);
             return updated;
           });
-        }
-
+        });
+        
         setParticipants([...roomCall.remoteParticipants]);
+      });
+
+      roomCall.on("isMutedChanged", () => {
+        setIsMuted(roomCall.isMuted);
       });
 
       setLoading(false);
     } catch (err: any) {
       setError(err.message || "Failed to join trial");
       setLoading(false);
+    }
+  }
+
+  // 🔧 FIX #1: Dedicated function to render remote video streams
+  async function renderRemoteVideo(stream: any, participant: any, userId: string) {
+    try {
+      console.log(`🎬 Rendering video for ${participant.displayName}`);
+      
+      // Dispose existing renderer if any
+      const existingRef = remoteVideoRefs.current.get(userId);
+      if (existingRef && existingRef.renderer) {
+        console.log(`♻️ Disposing old renderer for ${userId}`);
+        existingRef.renderer.dispose();
+      }
+      
+      const renderer = new VideoStreamRenderer(stream);
+      const view = await renderer.createView();
+      
+      remoteVideoRefs.current.set(userId, {
+        renderer,
+        view,
+        participant,
+        streamType: 'Video',
+        videoOff: false
+      });
+      
+      console.log(`✅ Video rendered successfully for ${participant.displayName}`);
+      setRenderTrigger(prev => prev + 1);
+    } catch (err) {
+      console.error(`❌ Error rendering video for ${participant.displayName}:`, err);
     }
   }
 
@@ -422,24 +570,37 @@ if (data.chatThreadId && data.endpointUrl) {
 
   const toggleScreenShare = async () => {
     if (!call) return;
+    
     try {
       if (isScreenSharing) {
+        // Stop screen sharing
         await call.stopScreenSharing();
         setIsScreenSharing(false);
-        setFeaturedParticipant("local");
-      } else {
-        try {
-          await call.startScreenSharing();
-          setIsScreenSharing(true);
-        } catch (permError) {
-          console.error("Screen share permission error:", permError);
-          setIsScreenSharing(false);
-          alert("Screen sharing failed. Please ensure you grant permission.");
+        
+        // Dispose screen share renderer
+        if (screenShareRenderer.current) {
+          screenShareRenderer.current.dispose();
+          screenShareRenderer.current = null;
         }
+        screenShareStream.current = null;
+        
+        // Switch back to local video
+        setFeaturedParticipant("local");
+        setRenderTrigger(prev => prev + 1);
+        
+        console.log("✅ Screen sharing stopped");
+      } else {
+        // Start screen sharing
+        await call.startScreenSharing();
+        setIsScreenSharing(true);
+        console.log("✅ Screen sharing started");
+        
+        // The localVideoStreamsUpdated event will handle rendering
       }
     } catch (err: any) {
       console.error("Screen share error:", err);
       setIsScreenSharing(false);
+      alert("Screen sharing failed. Please try again.");
     }
   };
 
@@ -550,13 +711,8 @@ if (data.chatThreadId && data.endpointUrl) {
                       className="w-full h-full [&>div]:!w-full [&>div]:!h-full [&_video]:object-contain"
                     />
                   ) : (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
-                      <div className="w-32 h-32 bg-gray-400 rounded-full flex items-center justify-center">
-                        <span className="text-white text-4xl font-bold">
-                          {featuredVideo.participant.displayName?.charAt(0)?.toUpperCase() || "P"}
-                        </span>
-                      </div>
-                    </div>
+                    // 🔧 FIX #2: Complete black screen when camera is off
+                    <div className="absolute inset-0 bg-black"></div>
                   )}
                   {featuredVideo.streamType === 'ScreenSharing' && (
                     <div className="absolute top-2 left-2 bg-[#0078D4] text-white px-2 py-1 rounded text-xs font-medium">
@@ -567,25 +723,18 @@ if (data.chatThreadId && data.endpointUrl) {
               ) : (
                 <>
                   {featuredParticipant === "local" ? (
-                    <>
-                      <div
-                        ref={featuredVideoRef}
-                        className="flex items-center justify-center w-full h-full bg-black"
-                      >
-                        <div className="w-[40%] max-w-[480px] aspect-video rounded-xl overflow-hidden shadow-lg border-2 border-gray-700">
-                          <div className="[&_video]:object-cover [&_video]:rounded-xl w-full h-full" />
-                        </div>
-                      </div>
+  <>
+    <div
+      ref={featuredVideoRef}
+      className="flex items-center justify-center w-full h-full bg-black"
+    />
 
-                      {isVideoOff && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
-                          <div className="w-24 h-24 bg-gray-500 rounded-full flex items-center justify-center shadow-md">
-                            <span className="text-white text-2xl font-bold">You</span>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  ) : null}
+    {/* 🔧 FIX #2: Complete black screen when attorney camera is off */}
+    {isVideoOff && (
+      <div className="absolute inset-0 bg-black"></div>
+    )}
+  </>
+) : null}
                 </>
               )}
             </div>
@@ -601,15 +750,14 @@ if (data.chatThreadId && data.endpointUrl) {
             }`}
           >
             <div className="w-28 h-20 bg-black rounded-lg overflow-hidden mb-2 relative">
-              <div ref={localThumbnailRef} className="w-full h-full [&_video]:object-cover" />
-              {isVideoOff && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-700">
-                  <div className="w-10 h-10 bg-gray-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm font-bold">You</span>
-                  </div>
-                </div>
-              )}
-            </div>
+  {!isVideoOff && featuredParticipant !== "local" && (
+    <div ref={localThumbnailRef} className="w-full h-full [&_video]:object-cover" />
+  )}
+  {/* 🔧 FIX #2: Complete black thumbnail when camera is off */}
+  {isVideoOff && (
+    <div className="absolute inset-0 bg-black"></div>
+  )}
+</div>
             <div className="text-sm font-medium text-gray-800">{displayName}</div>
           </button>
 
@@ -642,13 +790,8 @@ if (data.chatThreadId && data.endpointUrl) {
                         className="w-full h-full [&_video]:object-cover"
                       />
                     ) : (
-                      <div className="absolute inset-0 flex items-center justify-center bg-gray-700">
-                        <div className="w-10 h-10 bg-gray-500 rounded-full flex items-center justify-center">
-                          <span className="text-white text-sm font-bold">
-                            {p.displayName?.charAt(0)?.toUpperCase() || "P"}
-                          </span>
-                        </div>
-                      </div>
+                      // 🔧 FIX #2: Complete black screen for remote participants when camera off
+                      <div className="absolute inset-0 bg-black"></div>
                     )}
                   </div>
                   <div className="text-sm font-medium text-gray-800">{p.displayName || "Participant"}</div>
@@ -815,7 +958,8 @@ if (data.chatThreadId && data.endpointUrl) {
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
                 placeholder="Type a message..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 placeholder-gray-500"
+                style={{ color: '#000000' }}
               />
               <button
                 onClick={sendMessage}

@@ -217,7 +217,7 @@ router.post("/cases/:caseId/submit-war-room", async (req, res) => {
     const approvedJurors = await JurorApplication.getApprovedJurorsForCase(
       caseId
     );
-    const requiredJurors = caseData.RequiredJurors || 1;
+    const requiredJurors = caseData.RequiredJurors || 2;
 
     if (approvedJurors.length < requiredJurors) {
       return res.status(400).json({

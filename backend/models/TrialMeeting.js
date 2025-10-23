@@ -4,7 +4,7 @@ const { poolPromise } = require("../config/db");
  * TrialMeeting Model - Manages virtual trial meetings
  */
 
-async function createMeeting(caseId, threadId, roomId, chatThreadId = null) {
+async function createMeeting(caseId, threadId, roomId, chatThreadId = null, chatServiceUserId = null) {
   try {
     const pool = await poolPromise;
     const result = await pool
@@ -13,9 +13,10 @@ async function createMeeting(caseId, threadId, roomId, chatThreadId = null) {
       .input("threadId", threadId)
       .input("roomId", roomId)
       .input("chatThreadId", chatThreadId)
+      .input("chatServiceUserId", chatServiceUserId)
       .input("status", "created").query(`
-        INSERT INTO dbo.TrialMeetings (CaseId, ThreadId, RoomId, ChatThreadId, Status, CreatedAt)
-        VALUES (@caseId, @threadId, @roomId, @chatThreadId, @status, GETUTCDATE());
+        INSERT INTO dbo.TrialMeetings (CaseId, ThreadId, RoomId, ChatThreadId, ChatServiceUserId, Status, CreatedAt)
+        VALUES (@caseId, @threadId, @roomId, @chatThreadId, @chatServiceUserId, @status, GETUTCDATE());
         SELECT SCOPE_IDENTITY() as MeetingId;
       `);
     return result.recordset[0].MeetingId;
@@ -31,7 +32,7 @@ async function getMeetingByCaseId(caseId) {
   const result = await pool.request()
     .input('caseId', caseId)
     .query(`
-      SELECT MeetingId, CaseId, ThreadId, RoomId, ChatThreadId, Status, CreatedAt, StartedAt, EndedAt
+      SELECT MeetingId, CaseId, ThreadId, RoomId, ChatThreadId, ChatServiceUserId, Status, CreatedAt, StartedAt, EndedAt
       FROM dbo.TrialMeetings 
       WHERE CaseId = @caseId
     `);

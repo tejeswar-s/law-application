@@ -292,7 +292,7 @@ export default function WarRoomPage() {
 
   const approvedCount = applications.filter(app => app.Status === "approved").length;
   const pendingCount = applications.filter(app => app.Status === "pending").length;
-  const canSubmit = approvedCount >= 2 && caseData?.AttorneyStatus === "war_room";
+  const canSubmit = approvedCount >= 1 && caseData?.AttorneyStatus === "war_room";
 
   const handleBackToCases = () => {
     router.push("/attorney");

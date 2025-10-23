@@ -2,8 +2,6 @@ const express = require("express");
 const {
   CommunicationIdentityClient,
 } = require("@azure/communication-identity");
-const { ChatClient } = require("@azure/communication-chat"); // ADD THIS
-const { AzureCommunicationTokenCredential } = require("@azure/communication-common"); // ADD THIS
 const { authMiddleware } = require("../middleware/authMiddleware");
 const TrialMeeting = require("../models/TrialMeeting");
 const Case = require("../models/Case");
@@ -17,15 +15,15 @@ const router = express.Router();
 const connectionString = process.env.ACS_CONNECTION_STRING;
 const identityClient = new CommunicationIdentityClient(connectionString);
 
-// Get ACS endpoint from connection string
-const ACS_ENDPOINT = connectionString.match(/endpoint=(https:\/\/[^;]+)/)?.[1] || 
-                     process.env.ACS_ENDPOINT;
-console.log("ACS_ENDPOINT extracted:", ACS_ENDPOINT);
-
 const {
   createRoom,
   addParticipantToRoom,
+  createChatThread,
+  addParticipantToChat,
+  ACS_ENDPOINT
 } = require("../services/acsRoomsService");
+
+console.log("ACS_ENDPOINT:", ACS_ENDPOINT);
 
 // All routes require authentication
 router.use(authMiddleware);
@@ -33,6 +31,8 @@ router.use(authMiddleware);
 /**
  * Create meeting room AND chat thread when war room is submitted
  * Called from attorneyRoutes.js submit-war-room endpoint
+ * 
+ * ✅ FIXED: Creates chat thread immediately with service identity AND stores service user ID
  */
 async function createTrialMeeting(caseId) {
   try {
@@ -44,41 +44,50 @@ async function createTrialMeeting(caseId) {
       return existingMeeting;
     }
 
-    console.log("No existing meeting, creating new ACS room...");
+    console.log("No existing meeting, creating new ACS room and chat...");
     const caseData = await Case.findById(caseId);
 
-    // ... date parsing code stays the same ...
-
-    // 1. Create ACS Room ONLY (no chat thread yet)
+    // 1. Create ACS Room for video
     const room = await createRoom(
       new Date(),
       new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
     );
-    console.log("ACS Room created successfully:", room.id);
+    console.log("✅ ACS Room created:", room.id);
 
-    // 2. NO CHAT THREAD CREATION HERE - we'll create it on first join
+    // 2. Create Chat Thread immediately (not on first join!)
+    const chatResult = await createChatThread(
+      `Trial: ${caseData.CaseTitle || 'Case ' + caseId}`
+    );
+    console.log("✅ Chat thread created:", chatResult.chatThreadId);
+    console.log("✅ Service user ID:", chatResult.serviceUserId);
 
-    // 3. Store in database WITHOUT chat thread ID
+    // 3. Store in database WITH chat thread ID AND service user ID
     const threadId = `trial-case-${caseId}-${Date.now()}`;
     const meetingId = await TrialMeeting.createMeeting(
       caseId,
       threadId,
       room.id,
-      null // chatThreadId is null initially
+      chatResult.chatThreadId,
+      chatResult.serviceUserId  // Store the service user ID!
     );
 
-    console.log(`Trial meeting stored, Meeting ID: ${meetingId}, Room ID: ${room.id}`);
+    console.log(`✅ Trial meeting created successfully!`);
+    console.log(`   Meeting ID: ${meetingId}`);
+    console.log(`   Room ID: ${room.id}`);
+    console.log(`   Chat Thread ID: ${chatResult.chatThreadId}`);
+    console.log(`   Service User ID: ${chatResult.serviceUserId}`);
 
     return {
       MeetingId: meetingId,
       CaseId: caseId,
       ThreadId: threadId,
       RoomId: room.id,
-      ChatThreadId: null,
+      ChatThreadId: chatResult.chatThreadId,
+      ChatServiceUserId: chatResult.serviceUserId,
       Status: "created",
     };
   } catch (error) {
-    console.error("Error creating trial meeting:", error);
+    console.error("❌ Error creating trial meeting:", error);
     throw error;
   }
 }
@@ -92,9 +101,6 @@ router.get("/meeting/:caseId", async (req, res) => {
     const { caseId } = req.params;
     const userId = req.user.id;
     const userType = req.user.type;
-
-    console.log("DEBUG - req.user:", req.user);
-    console.log("DEBUG - userType:", userType);
 
     const caseData = await Case.findById(caseId);
     if (!caseData) {
@@ -127,6 +133,7 @@ router.get("/meeting/:caseId", async (req, res) => {
         meetingId: meeting.MeetingId,
         threadId: meeting.ThreadId,
         chatThreadId: meeting.ChatThreadId,
+        roomId: meeting.RoomId,
         status: meeting.Status,
         createdAt: meeting.CreatedAt,
       },
@@ -140,6 +147,8 @@ router.get("/meeting/:caseId", async (req, res) => {
 /**
  * POST /api/trial/join/:caseId
  * Generate ACS token for user to join trial with chat support
+ * 
+ * ✅ FIXED: Uses stored service user ID to add participants to chat
  */
 router.post("/join/:caseId", async (req, res) => {
   try {
@@ -175,47 +184,37 @@ router.post("/join/:caseId", async (req, res) => {
       return res.status(403).json({ message: "Invalid user type" });
     }
 
-    let meeting = await TrialMeeting.getMeetingByCaseId(caseId);
+    const meeting = await TrialMeeting.getMeetingByCaseId(caseId);
     if (!meeting) {
       return res.status(404).json({ message: "Meeting not found. Please contact administrator." });
+    }
+
+    if (!meeting.ChatThreadId) {
+      return res.status(500).json({ message: "Chat not available for this meeting." });
     }
 
     // Create ACS user identity and token WITH CHAT SCOPE
     const identityResponse = await identityClient.createUser();
     const acsUserId = identityResponse.communicationUserId;
 
-    // Add participant to ACS Room
+    // Add participant to ACS Room (for video)
     await addParticipantToRoom(meeting.RoomId, acsUserId, participantRole);
 
     // Generate token with VoIP AND Chat scopes
     const tokenResponse = await identityClient.getToken(identityResponse, ["voip", "chat"]);
 
-    // CREATE CHAT THREAD if it doesn't exist (first person to join)
-    let chatThreadId = meeting.ChatThreadId;
-    if (!chatThreadId) {
+    // ✅ ADD USER TO CHAT THREAD using the stored service user ID
+    if (meeting.ChatThreadId && meeting.ChatServiceUserId) {
       try {
-        console.log("First person joining - creating chat thread...");
-        const credential = new AzureCommunicationTokenCredential(tokenResponse.token);
-        const chatClient = new ChatClient(ACS_ENDPOINT, credential);
-        
-        const createChatThreadResult = await chatClient.createChatThread({
-          topic: `Trial Case ${caseId} - ${caseData.CaseTitle}`
-        });
-        
-        chatThreadId = createChatThreadResult.chatThread.id;
-        
-        // Update database with chat thread ID
-        const { poolPromise } = require("../config/db");
-        const pool = await poolPromise;
-        await pool.request()
-          .input("chatThreadId", chatThreadId)
-          .input("meetingId", meeting.MeetingId)
-          .query(`UPDATE dbo.TrialMeetings SET ChatThreadId = @chatThreadId WHERE MeetingId = @meetingId`);
-        
-        console.log("Chat thread created successfully:", chatThreadId);
-      } catch (chatError) {
-        console.error("Failed to create chat thread:", chatError);
-        // Continue without chat
+        await addParticipantToChat(
+          meeting.ChatThreadId, 
+          meeting.ChatServiceUserId,  // Use the stored service user ID!
+          acsUserId, 
+          displayName
+        );
+      } catch (chatAddError) {
+        console.error("Failed to add participant to chat:", chatAddError);
+        // Continue anyway - they can still join video
       }
     }
 
@@ -227,6 +226,10 @@ router.post("/join/:caseId", async (req, res) => {
       await TrialMeeting.updateMeetingStatus(meeting.MeetingId, "active");
     }
 
+    console.log(`✅ ${displayName} joined successfully`);
+    console.log(`   ACS User ID: ${acsUserId}`);
+    console.log(`   Chat Thread: ${meeting.ChatThreadId}`);
+
     res.json({
       success: true,
       token: tokenResponse.token,
@@ -234,11 +237,11 @@ router.post("/join/:caseId", async (req, res) => {
       userId: acsUserId,
       displayName: displayName,
       roomId: meeting.RoomId,
-      chatThreadId: chatThreadId,
+      chatThreadId: meeting.ChatThreadId,
       endpointUrl: ACS_ENDPOINT
     });
   } catch (error) {
-    console.error("Error joining trial:", error);
+    console.error("❌ Error joining trial:", error);
     res.status(500).json({ message: "Failed to join trial" });
   }
 });
@@ -268,8 +271,11 @@ router.get("/participants/:caseId", async (req, res) => {
   }
 });
 
-// Get approved jurors for a trial
-router.get("/case/:caseId/jurors", authMiddleware, async (req, res) => {
+/**
+ * GET /api/trial/case/:caseId/jurors
+ * Get approved jurors for a trial
+ */
+router.get("/case/:caseId/jurors", async (req, res) => {
   try {
     const { caseId } = req.params;
 
@@ -288,9 +294,13 @@ router.get("/case/:caseId/jurors", authMiddleware, async (req, res) => {
   }
 });
 
-// Juror join endpoint
-// Juror join endpoint - FIXED VERSION
-router.post("/juror-join/:caseId", authMiddleware, async (req, res) => {
+/**
+ * POST /api/trial/juror-join/:caseId
+ * Juror join endpoint
+ * 
+ * ✅ FIXED: Uses stored service user ID to add juror to chat
+ */
+router.post("/juror-join/:caseId", async (req, res) => {
   try {
     const { caseId } = req.params;
     const jurorId = req.user.id;
@@ -302,7 +312,7 @@ router.post("/juror-join/:caseId", authMiddleware, async (req, res) => {
       .request()
       .input("caseId", caseId)
       .input("jurorId", jurorId).query(`
-        SELECT ja.Status, tm.RoomId, tm.ChatThreadId, j.Name
+        SELECT ja.Status, tm.RoomId, tm.ChatThreadId, tm.ChatServiceUserId, tm.MeetingId, j.Name
         FROM dbo.JurorApplications ja
         JOIN dbo.TrialMeetings tm ON ja.CaseId = tm.CaseId
         JOIN dbo.Jurors j ON ja.JurorId = j.JurorId
@@ -316,39 +326,70 @@ router.post("/juror-join/:caseId", authMiddleware, async (req, res) => {
     const data = verification.recordset[0];
     const roomId = data.RoomId;
     const chatThreadId = data.ChatThreadId;
+    const chatServiceUserId = data.ChatServiceUserId;
+    const meetingId = data.MeetingId;
+    const jurorName = data.Name;
 
+    // Create identity and token
     const identity = await identityClient.createUser();
     const token = await identityClient.getToken(identity, ["voip", "chat"]);
 
+    // Add to room (for video)
     try {
       await addParticipantToRoom(roomId, identity.communicationUserId, "Attendee");
     } catch (err) {
       if (err.statusCode !== 409) throw err;
     }
 
-    // ✅ REMOVED: Manual chat participant addition
-    // Users are automatically added when they send their first message
-    // This avoids the 403 permission error
-    
-    console.log(`Juror ${data.Name} prepared to join - will be added to chat on first message`);
+    // ✅ ADD JUROR TO CHAT THREAD using the stored service user ID
+    if (chatThreadId && chatServiceUserId) {
+      try {
+        await addParticipantToChat(
+          chatThreadId, 
+          chatServiceUserId,  // Use the stored service user ID!
+          identity.communicationUserId, 
+          `${jurorName} (Juror)`
+        );
+      } catch (chatAddError) {
+        console.error("Failed to add juror to chat:", chatAddError);
+        // Continue anyway - they can still join video
+      }
+    }
+
+    // Track in database
+    await TrialMeeting.addParticipant(
+      meetingId,
+      jurorId,
+      "juror",
+      `${jurorName} (Juror)`,
+      identity.communicationUserId
+    );
+
+    console.log(`✅ Juror ${jurorName} joined successfully with chat access`);
 
     res.json({
+      success: true,
       token: token.token,
+      expiresOn: token.expiresOn,
       roomId: roomId,
-      displayName: `${data.Name} (Juror)`,
+      displayName: `${jurorName} (Juror)`,
       userId: identity.communicationUserId,
       chatThreadId: chatThreadId,
       endpointUrl: ACS_ENDPOINT
     });
   } catch (error) {
-    console.error("Error in juror join:", error);
+    console.error("❌ Error in juror join:", error);
     if (error.statusCode === 409) {
       return res.status(200).json({ message: "Already in room" });
     }
     res.status(500).json({ error: "Failed to join trial" });
   }
 });
-// Get today's scheduled trials for admin
+
+/**
+ * GET /api/trial/admin/trials/today
+ * Get today's scheduled trials for admin
+ */
 router.get("/admin/trials/today", async (req, res) => {
   try {
     const { poolPromise } = require("../config/db");
@@ -388,7 +429,12 @@ router.get("/admin/trials/today", async (req, res) => {
   }
 });
 
-// Admin join trial
+/**
+ * POST /api/trial/admin-join/:caseId
+ * Admin join trial
+ * 
+ * ✅ FIXED: Uses stored service user ID to add admin to chat
+ */
 router.post("/admin-join/:caseId", async (req, res) => {
   try {
     const { caseId } = req.params;
@@ -404,11 +450,12 @@ router.post("/admin-join/:caseId", async (req, res) => {
           c.ScheduledTime,
           tm.RoomId,
           tm.MeetingId,
-          tm.ChatThreadId
+          tm.ChatThreadId,
+          tm.ChatServiceUserId
         FROM Cases c
         JOIN TrialMeetings tm ON c.CaseId = tm.CaseId
         WHERE c.CaseId = @caseId 
-          AND c.AttorneyStatus IN ('approved', 'war_room')
+          AND c.AttorneyStatus IN ('approved', 'war_room', 'join_trial')
       `);
 
     if (result.recordset.length === 0) {
@@ -430,29 +477,43 @@ router.post("/admin-join/:caseId", async (req, res) => {
       "chat"
     ]);
 
-    // Note: Admin will be automatically added to chat when they send first message
-    // No manual adding needed
+    // ✅ ADD ADMIN TO CHAT THREAD using the stored service user ID
+    if (trial.ChatThreadId && trial.ChatServiceUserId) {
+      try {
+        await addParticipantToChat(
+          trial.ChatThreadId, 
+          trial.ChatServiceUserId,  // Use the stored service user ID!
+          acsUserId, 
+          "Court Administrator"
+        );
+      } catch (chatAddError) {
+        console.error("Failed to add admin to chat:", chatAddError);
+        // Continue anyway - they can still join video
+      }
+    }
 
     await TrialMeeting.addParticipant(
       trial.MeetingId,
       0,
       "admin",
-      "Admin Observer",
+      "Court Administrator",
       acsUserId
     );
+
+    console.log(`✅ Admin joined trial ${caseId} with chat access`);
 
     res.json({
       success: true,
       token: tokenResponse.token,
       expiresOn: tokenResponse.expiresOn,
       userId: acsUserId,
-      displayName: "Admin Observer",
+      displayName: "Court Administrator",
       roomId: trial.RoomId,
       chatThreadId: trial.ChatThreadId,
       endpointUrl: ACS_ENDPOINT
     });
   } catch (error) {
-    console.error("Error joining trial as admin:", error);
+    console.error("❌ Error joining trial as admin:", error);
     res.status(500).json({
       success: false,
       message: "Failed to join trial",

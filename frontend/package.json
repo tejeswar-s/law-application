@@ -9,7 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@azure/communication-calling": "^1.38.1",
+    "@azure/communication-calling": "^1.39.1",
     "@azure/communication-chat": "^1.6.0",
     "@azure/communication-common": "^2.4.0",
     "@heroicons/react": "^2.2.0",
